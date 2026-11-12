@@ -57,3 +57,6 @@ Thumbs.db
 # Large datasets - keep locally, do not upload to GitHub
 **/data/nasa_power.csv
 **/data/firms_hotspots.csv
+
+/nusafire/data/nasa_power.csv
+/nusafire/data/firms_hotspots.csv
