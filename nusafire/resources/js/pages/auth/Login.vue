@@ -1,6 +1,6 @@
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { useTheme } from '@/composables/useTheme';
 
@@ -10,7 +10,7 @@ defineProps<{
     canRegister?: boolean;
 }>();
 
-const { theme, initializeTheme, toggleTheme } = useTheme();
+const { theme, toggleTheme } = useTheme();
 
 const showPassword = ref(false);
 
@@ -28,9 +28,7 @@ function submit() {
     });
 }
 
-onMounted(() => {
-    initializeTheme();
-});
+
 </script>
 
 <template>

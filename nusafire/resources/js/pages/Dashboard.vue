@@ -1,22 +1,15 @@
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { Head, router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Head, Link } from '@inertiajs/vue3';
+import AppSidebar from '@/components/AppSidebar.vue';
 import { useTheme } from '@/composables/useTheme';
 
-const { theme, initializeTheme, toggleTheme } = useTheme();
+const { theme, toggleTheme } = useTheme();
 
-const activePage = ref('Overview');
-const period = ref('7 Days');
-const isLoggingOut = ref(false);
 const mobileMenuOpen = ref(false);
-
-const navigation = [
-    { label: 'Overview', icon: '◫' },
-    { label: 'Hotspot Map', icon: '◎' },
-    { label: 'Weather Analysis', icon: '☁' },
-    { label: 'Burned Area', icon: '▧' },
-];
+const sidebarCollapsed = ref(false);
+const period = ref('7 Days');
 
 const periods = ['7 Days', '30 Days', '90 Days'];
 
@@ -32,12 +25,12 @@ const demoTrend = computed(() => {
 
 const chartPoints = computed(() => {
     const values = demoTrend.value;
-    const width = 600;
-    const height = 180;
+    const width = 580;
+    const height = 155;
     const max = Math.max(...values) + 10;
 
     return values.map((value, index) => ({
-        x: 10 + (index * (width - 20)) / (values.length - 1),
+        x: 10 + (index * (width - 20)) / Math.max(values.length - 1, 1),
         y: height - (value / max) * (height - 20),
     }));
 });
@@ -48,9 +41,12 @@ const chartLine = computed(() =>
         .join(' '),
 );
 
-const chartArea = computed(() =>
-    `${chartLine.value} L 590 180 L 10 180 Z`,
-);
+const chartArea = computed(() => {
+    const lastX = chartPoints.value.at(-1)?.x ?? 590;
+    const firstX = chartPoints.value[0]?.x ?? 10;
+
+    return `${chartLine.value} L ${lastX} 155 L ${firstX} 155 Z`;
+});
 
 const regions = [
     { name: 'Sumatra', width: 78 },
@@ -65,163 +61,29 @@ const weatherItems = [
     { label: 'Precipitation', value: '—', unit: 'mm', icon: '☂' },
 ];
 
-const pageDescriptions: Record<string, string> = {
-    Overview: 'A unified overview of forest fire activity across Indonesia.',
-    'Hotspot Map': 'Explore the distribution of detected fire hotspots.',
-    'Weather Analysis': 'Review weather conditions associated with fire activity.',
-    'Burned Area': 'Explore burned-area information and historical patterns.',
-};
 
-function selectPage(label: string) {
-    activePage.value = label;
-    mobileMenuOpen.value = false;
-}
-
-function logout() {
-    if (isLoggingOut.value) return;
-
-    isLoggingOut.value = true;
-
-    router.post('/logout', {}, {
-        onFinish: () => {
-            isLoggingOut.value = false;
-        },
-    });
-}
-
-onMounted(() => {
-    initializeTheme();
-});
 </script>
 
 <template>
     <Head title="NusaFire Dashboard" />
 
-    <div
-        class="nf-app"
-        :class="`theme-${theme}`"
-    >
-        <div
-            v-if="mobileMenuOpen"
-            class="nf-mobile-overlay"
-            @click="mobileMenuOpen = false"
+    <div class="nf-app" :class="`theme-${theme}`">
+        <!-- Shared sidebar: used by other pages too -->
+        <AppSidebar
+            :mobile-open="mobileMenuOpen"
+            v-model:collapsed="sidebarCollapsed"
+            @close="mobileMenuOpen = false"
         />
 
-        <aside
-            class="nf-sidebar"
-            :class="{ 'nf-sidebar-open': mobileMenuOpen }"
-        >
-            <div class="nf-brand">
-                <div class="nf-brand-mark">
-                    <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
-                        <path
-                            d="M20 4L7 22h9l-3 13 14-19h-9L20 4Z"
-                            fill="currentColor"
-                        />
-                        <path
-                            d="M5 29c5-3 9-3 14 0s10 3 16-1"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            opacity=".55"
-                        />
-                    </svg>
-                </div>
-
-                <div class="nf-brand-copy">
-                    <strong>NusaFire</strong>
-                    <span>FOREST INTELLIGENCE</span>
-                </div>
-
-                <button
-                    class="nf-icon-button nf-mobile-close"
-                    aria-label="Close menu"
-                    @click="mobileMenuOpen = false"
-                >
-                    ✕
-                </button>
-            </div>
-
-            <div class="nf-sidebar-section">
-                <span class="nf-section-label">WORKSPACE</span>
-
-                <nav class="nf-navigation">
-                    <button
-                        v-for="item in navigation"
-                        :key="item.label"
-                        class="nf-nav-item"
-                        :class="{ 'nf-nav-active': activePage === item.label }"
-                        @click="selectPage(item.label)"
-                    >
-                        <span class="nf-nav-icon">{{ item.icon }}</span>
-                        <span>{{ item.label }}</span>
-                        <span
-                            v-if="activePage === item.label"
-                            class="nf-nav-indicator"
-                        />
-                    </button>
-                </nav>
-            </div>
-
-            <div class="nf-sidebar-note">
-                <div class="nf-note-icon">✦</div>
-                <strong>Forest Watch</strong>
-                <p>Understanding fire activity through environmental data.</p>
-                <span class="nf-note-status">
-                    <span class="nf-status-dot" />
-                    Intelligence workspace
-                </span>
-            </div>
-
-            <div class="nf-sidebar-bottom">
-                <div class="nf-user-card">
-                    <div class="nf-avatar">NF</div>
-                    <div class="nf-user-copy">
-                        <strong>NusaFire User</strong>
-                        <span>Workspace account</span>
-                    </div>
-                </div>
-
-                <button
-                    class="nf-logout-button"
-                    :disabled="isLoggingOut"
-                    @click="logout"
-                >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.8"
-                        aria-hidden="true"
-                    >
-                        <path
-                            d="M10 17l5-5-5-5M15 12H3"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        />
-                        <path
-                            d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"
-                            stroke-linecap="round"
-                        />
-                    </svg>
-
-                    <span>{{ isLoggingOut ? 'Logging out...' : 'Logout' }}</span>
-                </button>
-
-                <div class="nf-sidebar-footer">
-                    <span>NUSAFIRE © 2026</span>
-                    <span>INDONESIA</span>
-                </div>
-            </div>
-        </aside>
-
-        <main class="nf-main">
+        <main class="nf-main" :class="{ 'nf-sidebar-collapsed': sidebarCollapsed }">
             <header class="nf-topbar">
                 <div class="nf-topbar-left">
                     <button
+                        type="button"
                         class="nf-icon-button nf-mobile-menu"
-                        aria-label="Open menu"
-                        @click="mobileMenuOpen = true"
+                        :class="{ 'nf-menu-visible': sidebarCollapsed }"
+                        aria-label="Open navigation menu"
+                        @click="sidebarCollapsed = false; mobileMenuOpen = true"
                     >
                         ☰
                     </button>
@@ -229,20 +91,29 @@ onMounted(() => {
                     <div class="nf-breadcrumb">
                         <span>Workspace</span>
                         <span class="nf-breadcrumb-separator">/</span>
-                        <strong>{{ activePage }}</strong>
+                        <strong>Overview</strong>
                     </div>
                 </div>
 
                 <div class="nf-topbar-right">
                     <span class="nf-live-indicator">
                         <span class="nf-status-dot" />
-                        <span>Monitoring workspace</span>
+                        Monitoring workspace
                     </span>
 
                     <button
+                        type="button"
                         class="nf-theme-toggle"
-                        :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
-                        :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+                        :aria-label="
+                            theme === 'dark'
+                                ? 'Switch to light mode'
+                                : 'Switch to dark mode'
+                        "
+                        :title="
+                            theme === 'dark'
+                                ? 'Switch to light mode'
+                                : 'Switch to dark mode'
+                        "
                         @click="toggleTheme"
                     >
                         <span v-if="theme === 'dark'">☀</span>
@@ -259,9 +130,11 @@ onMounted(() => {
                             ENVIRONMENTAL INTELLIGENCE
                         </div>
 
-                        <h1>{{ activePage === 'Overview' ? 'Forest Intelligence' : activePage }}</h1>
+                        <h1>Forest Intelligence</h1>
 
-                        <p>{{ pageDescriptions[activePage] }}</p>
+                        <p>
+                            A unified overview of forest fire activity across Indonesia.
+                        </p>
                     </div>
 
                     <div class="nf-heading-date">
@@ -273,292 +146,310 @@ onMounted(() => {
                     </div>
                 </section>
 
-                <template v-if="activePage === 'Overview'">
-                    <section class="nf-stats-grid">
-                        <article class="nf-stat-card">
-                            <div class="nf-stat-top">
-                                <span class="nf-stat-label">Detected Hotspots</span>
-                                <span class="nf-stat-icon nf-icon-green">◎</span>
-                            </div>
-                            <div class="nf-stat-value">—</div>
-                            <div class="nf-stat-bottom">
-                                <span class="nf-stat-caption">NASA FIRMS</span>
-                                <span class="nf-stat-tag">Awaiting data</span>
-                            </div>
-                        </article>
+                <!-- Summary statistics -->
+                <section class="nf-stats-grid">
+                    <article class="nf-stat-card">
+                        <div class="nf-stat-top">
+                            <span class="nf-stat-label">Detected Hotspots</span>
+                            <span class="nf-stat-icon nf-icon-green">◎</span>
+                        </div>
 
-                        <article class="nf-stat-card">
-                            <div class="nf-stat-top">
-                                <span class="nf-stat-label">Burned Area</span>
-                                <span class="nf-stat-icon nf-icon-orange">▧</span>
-                            </div>
-                            <div class="nf-stat-value">— <small>ha</small></div>
-                            <div class="nf-stat-bottom">
-                                <span class="nf-stat-caption">MapBiomas Fire</span>
-                                <span class="nf-stat-tag">Awaiting data</span>
-                            </div>
-                        </article>
+                        <div class="nf-stat-value">—</div>
 
-                        <article class="nf-stat-card">
-                            <div class="nf-stat-top">
-                                <span class="nf-stat-label">Average Temperature</span>
-                                <span class="nf-stat-icon nf-icon-yellow">☀</span>
-                            </div>
-                            <div class="nf-stat-value">— <small>°C</small></div>
-                            <div class="nf-stat-bottom">
-                                <span class="nf-stat-caption">NASA POWER</span>
-                                <span class="nf-stat-tag">Awaiting data</span>
-                            </div>
-                        </article>
+                        <div class="nf-stat-bottom">
+                            <span class="nf-stat-caption">NASA FIRMS</span>
+                            <span class="nf-stat-tag">Awaiting data</span>
+                        </div>
+                    </article>
 
-                        <article class="nf-stat-card">
-                            <div class="nf-stat-top">
-                                <span class="nf-stat-label">Weather Humidity</span>
-                                <span class="nf-stat-icon nf-icon-blue">◌</span>
-                            </div>
-                            <div class="nf-stat-value">— <small>%</small></div>
-                            <div class="nf-stat-bottom">
-                                <span class="nf-stat-caption">Relative humidity</span>
-                                <span class="nf-stat-tag">Awaiting data</span>
-                            </div>
-                        </article>
-                    </section>
+                    <article class="nf-stat-card">
+                        <div class="nf-stat-top">
+                            <span class="nf-stat-label">Burned Area</span>
+                            <span class="nf-stat-icon nf-icon-orange">▧</span>
+                        </div>
 
-                    <section class="nf-primary-grid">
-                        <article class="nf-panel nf-trend-panel">
-                            <div class="nf-panel-heading">
-                                <div>
-                                    <div class="nf-panel-kicker">FIRE ACTIVITY</div>
-                                    <h2>Hotspot activity</h2>
-                                    <p>Historical detection trend</p>
-                                </div>
+                        <div class="nf-stat-value">— <small>ha</small></div>
 
-                                <select v-model="period" class="nf-select" aria-label="Chart period">
-                                    <option v-for="item in periods" :key="item" :value="item">
-                                        {{ item }}
-                                    </option>
-                                </select>
-                            </div>
+                        <div class="nf-stat-bottom">
+                            <span class="nf-stat-caption">Burned-area data</span>
+                            <span class="nf-stat-tag">Awaiting data</span>
+                        </div>
+                    </article>
 
-                            <div class="nf-chart-legend">
-                                <span class="nf-legend-dot" />
-                                Hotspot detections
-                                <span class="nf-demo-label">Illustrative preview</span>
+                    <article class="nf-stat-card">
+                        <div class="nf-stat-top">
+                            <span class="nf-stat-label">Average Temperature</span>
+                            <span class="nf-stat-icon nf-icon-yellow">☀</span>
+                        </div>
+
+                        <div class="nf-stat-value">— <small>°C</small></div>
+
+                        <div class="nf-stat-bottom">
+                            <span class="nf-stat-caption">NASA POWER</span>
+                            <span class="nf-stat-tag">Awaiting data</span>
+                        </div>
+                    </article>
+
+                    <article class="nf-stat-card">
+                        <div class="nf-stat-top">
+                            <span class="nf-stat-label">Relative Humidity</span>
+                            <span class="nf-stat-icon nf-icon-blue">◌</span>
+                        </div>
+
+                        <div class="nf-stat-value">— <small>%</small></div>
+
+                        <div class="nf-stat-bottom">
+                            <span class="nf-stat-caption">Weather indicators</span>
+                            <span class="nf-stat-tag">Awaiting data</span>
+                        </div>
+                    </article>
+                </section>
+
+                <!-- Trend chart and regional overview -->
+                <section class="nf-primary-grid">
+                    <article class="nf-panel nf-trend-panel">
+                        <div class="nf-panel-heading">
+                            <div>
+                                <div class="nf-panel-kicker">FIRE ACTIVITY</div>
+                                <h2>Hotspot activity</h2>
+                                <p>Illustrative historical trend preview</p>
                             </div>
 
-                            <div class="nf-chart-wrap">
-                                <div class="nf-chart-y-labels">
-                                    <span>High</span>
-                                    <span>Medium</span>
-                                    <span>Low</span>
-                                    <span>0</span>
-                                </div>
-
-                                <svg
-                                    class="nf-line-chart"
-                                    viewBox="0 0 600 190"
-                                    preserveAspectRatio="none"
-                                    role="img"
-                                    aria-label="Illustrative hotspot activity trend"
+                            <select
+                                v-model="period"
+                                class="nf-select"
+                                aria-label="Chart period"
+                            >
+                                <option
+                                    v-for="item in periods"
+                                    :key="item"
+                                    :value="item"
                                 >
-                                    <defs>
-                                        <linearGradient id="nf-chart-fill" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stop-color="#43a978" stop-opacity=".24" />
-                                            <stop offset="100%" stop-color="#43a978" stop-opacity="0" />
-                                        </linearGradient>
-                                    </defs>
+                                    {{ item }}
+                                </option>
+                            </select>
+                        </div>
 
-                                    <line x1="10" y1="25" x2="590" y2="25" class="nf-chart-grid" />
-                                    <line x1="10" y1="70" x2="590" y2="70" class="nf-chart-grid" />
-                                    <line x1="10" y1="115" x2="590" y2="115" class="nf-chart-grid" />
-                                    <line x1="10" y1="180" x2="590" y2="180" class="nf-chart-grid" />
+                        <div class="nf-chart-legend">
+                            <span class="nf-legend-dot" />
+                            Hotspot detections
+                            <span class="nf-demo-label">Demo visualization</span>
+                        </div>
 
-                                    <path :d="chartArea" fill="url(#nf-chart-fill)" />
-                                    <path :d="chartLine" class="nf-chart-line" />
-
-                                    <circle
-                                        v-for="(point, index) in chartPoints"
-                                        :key="index"
-                                        :cx="point.x"
-                                        :cy="point.y"
-                                        r="4"
-                                        class="nf-chart-point"
-                                    />
-                                </svg>
+                        <div class="nf-chart-wrap">
+                            <div class="nf-chart-y-labels">
+                                <span>High</span>
+                                <span>Medium</span>
+                                <span>Low</span>
+                                <span>0</span>
                             </div>
 
-                            <div class="nf-chart-x-labels">
-                                <span>Period start</span>
-                                <span>Mid-period</span>
-                                <span>Period end</span>
-                            </div>
-
-                            <div class="nf-panel-footnote">
-                                <span>ⓘ</span>
-                                Example visualization only. No real hotspot records are plotted.
-                            </div>
-                        </article>
-
-                        <article class="nf-panel nf-region-panel">
-                            <div class="nf-panel-heading">
-                                <div>
-                                    <div class="nf-panel-kicker">REGIONAL OVERVIEW</div>
-                                    <h2>Regional distribution</h2>
-                                    <p>Areas to monitor</p>
-                                </div>
-                                <span class="nf-mini-icon">⌖</span>
-                            </div>
-
-                            <div class="nf-region-list">
-                                <div
-                                    v-for="(region, index) in regions"
-                                    :key="region.name"
-                                    class="nf-region-item"
-                                >
-                                    <div class="nf-region-top">
-                                        <span class="nf-region-number">
-                                            0{{ index + 1 }}
-                                        </span>
-                                        <span class="nf-region-name">{{ region.name }}</span>
-                                        <span class="nf-region-value">—</span>
-                                    </div>
-                                    <div class="nf-progress-track">
-                                        <div
-                                            class="nf-progress-fill"
-                                            :style="{ width: `${region.width}%` }"
+                            <svg
+                                class="nf-line-chart"
+                                viewBox="0 0 600 165"
+                                preserveAspectRatio="none"
+                                role="img"
+                                aria-label="Illustrative hotspot trend, not real data"
+                            >
+                                <defs>
+                                    <linearGradient
+                                        id="nf-chart-fill"
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                    >
+                                        <stop
+                                            offset="0%"
+                                            stop-color="#43a978"
+                                            stop-opacity=".24"
                                         />
-                                    </div>
-                                </div>
+                                        <stop
+                                            offset="100%"
+                                            stop-color="#43a978"
+                                            stop-opacity="0"
+                                        />
+                                    </linearGradient>
+                                </defs>
+
+                                <line x1="10" y1="20" x2="590" y2="20" class="nf-chart-grid" />
+                                <line x1="10" y1="60" x2="590" y2="60" class="nf-chart-grid" />
+                                <line x1="10" y1="100" x2="590" y2="100" class="nf-chart-grid" />
+                                <line x1="10" y1="155" x2="590" y2="155" class="nf-chart-grid" />
+
+                                <path :d="chartArea" fill="url(#nf-chart-fill)" />
+                                <path :d="chartLine" class="nf-chart-line" />
+
+                                <circle
+                                    v-for="(point, index) in chartPoints"
+                                    :key="index"
+                                    :cx="point.x"
+                                    :cy="point.y"
+                                    r="4"
+                                    class="nf-chart-point"
+                                />
+                            </svg>
+                        </div>
+
+                        <div class="nf-chart-x-labels">
+                            <span>Period start</span>
+                            <span>Mid-period</span>
+                            <span>Period end</span>
+                        </div>
+
+                        <div class="nf-panel-footnote">
+                            <span>ⓘ</span>
+                            Example visualization only. Real hotspot records are not plotted.
+                        </div>
+                    </article>
+
+                    <article class="nf-panel nf-region-panel">
+                        <div class="nf-panel-heading">
+                            <div>
+                                <div class="nf-panel-kicker">REGIONAL OVERVIEW</div>
+                                <h2>Regional distribution</h2>
+                                <p>Regions to monitor</p>
                             </div>
 
-                            <div class="nf-panel-footnote">
-                                <span>ⓘ</span>
-                                Bars are decorative, not measured regional totals.
-                            </div>
-                        </article>
-                    </section>
+                            <span class="nf-mini-icon">⌖</span>
+                        </div>
 
-                    <section class="nf-secondary-grid">
-                        <article class="nf-panel nf-map-panel">
-                            <div class="nf-panel-heading">
-                                <div>
-                                    <div class="nf-panel-kicker">GEOSPATIAL MONITORING</div>
-                                    <h2>Indonesia overview</h2>
-                                    <p>Geographic visualization will appear here</p>
-                                </div>
-                                <button class="nf-outline-button" @click="selectPage('Hotspot Map')">
-                                    Explore map ↗
-                                </button>
-                            </div>
-
-                            <div class="nf-map-preview">
-                                <div class="nf-map-grid" />
-
-                                <svg
-                                    viewBox="0 0 650 250"
-                                    class="nf-island-art"
-                                    role="img"
-                                    aria-label="Decorative illustration, not a geographic map"
-                                >
-                                    <path
-                                        d="M65 82l35-20 35 8 18 20-14 17-28 4-12 18-23-4-18-17z"
-                                        class="nf-island"
-                                    />
-                                    <path
-                                        d="M155 148l22-9 21 9 18 28-9 35-16 12-12-20-17-18z"
-                                        class="nf-island"
-                                    />
-                                    <path
-                                        d="M238 63l20-10 17 13-6 17-20 5-14-10z"
-                                        class="nf-island"
-                                    />
-                                    <path
-                                        d="M270 102l18-9 14 12-6 18-20 5-13-12z"
-                                        class="nf-island"
-                                    />
-                                    <path
-                                        d="M335 112l24-17 25 5 17 19-11 17-24-3-17 12-18-12z"
-                                        class="nf-island"
-                                    />
-                                    <path
-                                        d="M420 73l35-16 38 11 18 20-13 19-32 6-19 20-25-10-15-22z"
-                                        class="nf-island"
-                                    />
-                                    <path
-                                        d="M505 155l21-9 19 12-5 17-25 5-14-11z"
-                                        class="nf-island"
-                                    />
-                                    <circle cx="130" cy="92" r="4" class="nf-map-dot" />
-                                    <circle cx="183" cy="174" r="4" class="nf-map-dot" />
-                                    <circle cx="355" cy="119" r="4" class="nf-map-dot" />
-                                    <circle cx="456" cy="88" r="4" class="nf-map-dot" />
-                                </svg>
-
-                                <div class="nf-map-placeholder">
-                                    <span class="nf-map-placeholder-icon">⌖</span>
-                                    <strong>Geospatial layer not connected</strong>
-                                    <span>Connect administrative boundaries and hotspot coordinates to display a real map.</span>
+                        <div class="nf-region-list">
+                            <div
+                                v-for="(region, index) in regions"
+                                :key="region.name"
+                                class="nf-region-item"
+                            >
+                                <div class="nf-region-top">
+                                    <span class="nf-region-number">
+                                        0{{ index + 1 }}
+                                    </span>
+                                    <span class="nf-region-name">{{ region.name }}</span>
+                                    <span class="nf-region-value">—</span>
                                 </div>
 
-                                <span class="nf-map-disclaimer">DECORATIVE PREVIEW · NOT A GEOGRAPHIC BASEMAP</span>
-                            </div>
-                        </article>
-
-                        <article class="nf-panel nf-weather-panel">
-                            <div class="nf-panel-heading">
-                                <div>
-                                    <div class="nf-panel-kicker">ENVIRONMENTAL CONDITIONS</div>
-                                    <h2>Weather snapshot</h2>
-                                    <p>Weather indicators</p>
-                                </div>
-                                <span class="nf-weather-symbol">☼</span>
-                            </div>
-
-                            <div class="nf-weather-list">
-                                <div
-                                    v-for="item in weatherItems"
-                                    :key="item.label"
-                                    class="nf-weather-item"
-                                >
-                                    <span class="nf-weather-icon">{{ item.icon }}</span>
-                                    <div class="nf-weather-copy">
-                                        <span>{{ item.label }}</span>
-                                        <strong>{{ item.value }} <small>{{ item.unit }}</small></strong>
-                                    </div>
+                                <div class="nf-progress-track">
+                                    <div
+                                        class="nf-progress-fill"
+                                        :style="{ width: `${region.width}%` }"
+                                    />
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="nf-weather-source">
-                                <span class="nf-status-dot" />
-                                NASA POWER · Pending integration
+                        <div class="nf-panel-footnote">
+                            <span>ⓘ</span>
+                            Decorative bars only; regional totals are not yet available.
+                        </div>
+                    </article>
+                </section>
+
+                <!-- Map preview and weather snapshot -->
+                <section class="nf-secondary-grid">
+                    <article class="nf-panel nf-map-panel">
+                        <div class="nf-panel-heading">
+                            <div>
+                                <div class="nf-panel-kicker">GEOSPATIAL MONITORING</div>
+                                <h2>Indonesia overview</h2>
+                                <p>Hotspot geographic visualization</p>
                             </div>
-                        </article>
-                    </section>
-                </template>
 
-                <section v-else class="nf-panel nf-placeholder-page">
-                    <div class="nf-placeholder-symbol">
-                        <span v-if="activePage === 'Hotspot Map'">◎</span>
-                        <span v-else-if="activePage === 'Weather Analysis'">☁</span>
-                        <span v-else>▧</span>
-                    </div>
-                    <h2>{{ activePage }}</h2>
-                    <p>{{ pageDescriptions[activePage] }}</p>
-                    <p class="nf-placeholder-detail">
-                        Halaman ini belum terhubung ke dataset atau backend.
-                        Tahap berikutnya adalah menghubungkan data hasil pengolahan
-                        ke Laravel dan menampilkan visualisasi yang sesuai.
-                    </p>
-                    <button class="nf-primary-button" @click="selectPage('Overview')">
-                        ← Back to overview
-                    </button>
+                            <Link href="/hotspot-map" class="nf-outline-button">
+                                Explore map ↗
+                            </Link>
+                        </div>
+
+                        <div class="nf-map-preview">
+                            <div class="nf-map-grid" />
+
+                            <svg
+                                viewBox="0 0 650 250"
+                                class="nf-island-art"
+                                role="img"
+                                aria-label="Decorative island illustration, not a geographic map"
+                            >
+                                <path d="M65 82l35-20 35 8 18 20-14 17-28 4-12 18-23-4-18-17z" class="nf-island" />
+                                <path d="M155 148l22-9 21 9 18 28-9 35-16 12-12-20-17-18z" class="nf-island" />
+                                <path d="M238 63l20-10 17 13-6 17-20 5-14-10z" class="nf-island" />
+                                <path d="M270 102l18-9 14 12-6 18-20 5-13-12z" class="nf-island" />
+                                <path d="M335 112l24-17 25 5 17 19-11 17-24-3-17 12-18-12z" class="nf-island" />
+                                <path d="M420 73l35-16 38 11 18 20-13 19-32 6-19 20-25-10-15-22z" class="nf-island" />
+                                <path d="M505 155l21-9 19 12-5 17-25 5-14-11z" class="nf-island" />
+
+                                <circle cx="130" cy="92" r="4" class="nf-map-dot" />
+                                <circle cx="183" cy="174" r="4" class="nf-map-dot" />
+                                <circle cx="355" cy="119" r="4" class="nf-map-dot" />
+                                <circle cx="456" cy="88" r="4" class="nf-map-dot" />
+                            </svg>
+
+                            <div class="nf-map-placeholder">
+                                <span class="nf-map-placeholder-icon">⌖</span>
+                                <strong>Geospatial layer not connected</strong>
+                                <span>
+                                    Connect geographic boundaries and hotspot coordinates
+                                    to display a real map.
+                                </span>
+
+                                <Link href="/hotspot-map" class="nf-map-link">
+                                    Open Hotspot Map
+                                </Link>
+                            </div>
+
+                            <span class="nf-map-disclaimer">
+                                DECORATIVE PREVIEW · NOT A GEOGRAPHIC BASEMAP
+                            </span>
+                        </div>
+                    </article>
+
+                    <article class="nf-panel nf-weather-panel">
+                        <div class="nf-panel-heading">
+                            <div>
+                                <div class="nf-panel-kicker">ENVIRONMENTAL CONDITIONS</div>
+                                <h2>Weather snapshot</h2>
+                                <p>Weather indicators</p>
+                            </div>
+
+                            <span class="nf-weather-symbol">☼</span>
+                        </div>
+
+                        <div class="nf-weather-list">
+                            <div
+                                v-for="item in weatherItems"
+                                :key="item.label"
+                                class="nf-weather-item"
+                            >
+                                <span class="nf-weather-icon">{{ item.icon }}</span>
+
+                                <div class="nf-weather-copy">
+                                    <span>{{ item.label }}</span>
+                                    <strong>
+                                        {{ item.value }}
+                                        <small>{{ item.unit }}</small>
+                                    </strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="nf-weather-source">
+                            <span class="nf-status-dot" />
+                            NASA POWER · Pending integration
+                        </div>
+
+                        <Link href="/weather-analysis" class="nf-weather-link">
+                            View weather analysis →
+                        </Link>
+                    </article>
                 </section>
 
                 <footer class="nf-footer">
                     <div>
                         <span class="nf-footer-mark">N</span>
-                        <span>NusaFire <span class="nf-footer-muted">· Environmental Intelligence</span></span>
+                        <span>
+                            NusaFire
+                            <span class="nf-footer-muted">· Environmental Intelligence</span>
+                        </span>
                     </div>
+
                     <span>BUILT FOR A SAFER, GREENER FUTURE</span>
                 </footer>
             </div>
@@ -569,7 +460,7 @@ onMounted(() => {
 <style>
 .nf-app {
     --db-bg: #f5f7f4;
-    --db-surface: #ffffff;
+    --db-surface: #fff;
     --db-surface-soft: #f8faf7;
     --db-text: #1c2922;
     --db-text-soft: #526158;
@@ -581,8 +472,8 @@ onMounted(() => {
     --db-shadow: 0 4px 20px rgb(23 49 33 / 3%);
 
     min-height: 100vh;
-    background: var(--db-bg);
     color: var(--db-text);
+    background: var(--db-bg);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 13px;
     transition: background .2s ease, color .2s ease;
@@ -617,268 +508,14 @@ onMounted(() => {
     cursor: pointer;
 }
 
-.nf-app button:disabled {
-    cursor: not-allowed;
-    opacity: .6;
-}
-
-.nf-sidebar {
-    position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 30;
-    display: flex;
-    flex-direction: column;
-    width: 252px;
-    padding: 25px 17px 17px;
-    background: var(--db-surface);
-    border-right: 1px solid var(--db-border);
-    transition: background .2s ease, transform .2s ease;
-}
-
-.nf-brand {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    min-height: 43px;
-    padding: 0 8px;
-    margin-bottom: 42px;
-}
-
-.nf-brand-mark {
-    display: grid;
-    width: 39px;
-    height: 39px;
-    place-items: center;
-    color: #fff;
-    background: #287a50;
-    border-radius: 12px;
-}
-
-.nf-brand-mark svg {
-    width: 29px;
-    height: 29px;
-}
-
-.nf-brand-copy {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.nf-brand-copy strong {
-    font-size: 19px;
-    font-weight: 750;
-    letter-spacing: -.7px;
-}
-
-.nf-brand-copy span {
-    color: var(--db-muted);
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-}
-
-.nf-section-label {
-    display: block;
-    padding: 0 12px;
-    margin-bottom: 12px;
-    color: var(--db-muted);
-    font-size: 9px;
-    font-weight: 750;
-    letter-spacing: 1.5px;
-}
-
-.nf-navigation {
-    display: grid;
-    gap: 5px;
-}
-
-.nf-nav-item {
-    position: relative;
-    display: flex;
-    align-items: center;
-    width: 100%;
-    gap: 12px;
-    min-height: 44px;
-    padding: 0 12px;
-    text-align: left;
-    color: var(--db-text-soft);
-    background: transparent;
-    border: 0;
-    border-radius: 9px;
-    transition: background .15s ease, color .15s ease;
-}
-
-.nf-nav-item:hover {
-    background: var(--db-surface-soft);
-    color: var(--db-text);
-}
-
-.nf-nav-active,
-.nf-nav-active:hover {
-    color: var(--db-accent);
-    background: var(--db-accent-soft);
-    font-weight: 650;
-}
-
-.nf-nav-icon {
-    display: inline-grid;
-    width: 20px;
-    place-items: center;
-    font-size: 19px;
-}
-
-.nf-nav-indicator {
-    position: absolute;
-    top: 11px;
-    right: 0;
-    width: 3px;
-    height: 22px;
-    background: var(--db-accent);
-    border-radius: 5px 0 0 5px;
-}
-
-.nf-sidebar-note {
-    padding: 17px 15px;
-    margin: auto 0 22px;
-    background: var(--db-surface-soft);
-    border: 1px solid var(--db-border);
-    border-radius: 12px;
-}
-
-.nf-note-icon {
-    display: grid;
-    width: 29px;
-    height: 29px;
-    margin-bottom: 12px;
-    place-items: center;
-    color: var(--db-accent);
-    background: var(--db-accent-soft);
-    border-radius: 9px;
-    font-size: 17px;
-}
-
-.nf-sidebar-note > strong {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 12px;
-}
-
-.nf-sidebar-note p {
-    margin: 0;
-    color: var(--db-text-soft);
-    font-size: 11px;
-    line-height: 1.7;
-}
-
-.nf-note-status {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-top: 13px;
-    color: var(--db-muted);
-    font-size: 9px;
-}
-
-.nf-status-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    flex: 0 0 7px;
-    background: #58b77b;
-    border-radius: 50%;
-}
-
-.nf-sidebar-bottom {
-    display: grid;
-    gap: 11px;
-}
-
-.nf-user-card {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 4px 14px;
-    border-top: 1px solid var(--db-border);
-}
-
-.nf-avatar {
-    display: grid;
-    width: 34px;
-    height: 34px;
-    place-items: center;
-    color: var(--db-accent);
-    background: var(--db-accent-soft);
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 800;
-}
-
-.nf-user-copy {
-    display: grid;
-    gap: 4px;
-}
-
-.nf-user-copy strong {
-    font-size: 11px;
-}
-
-.nf-user-copy span {
-    color: var(--db-muted);
-    font-size: 10px;
-}
-
-.nf-logout-button {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    width: 100%;
-    min-height: 42px;
-    padding: 0 12px;
-    color: #c05b55;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 9px;
-    text-align: left;
-    transition: background .15s ease, border-color .15s ease;
-}
-
-.nf-logout-button:hover {
-    background: #fff0ee;
-    border-color: #f2d9d5;
-}
-
-.theme-dark .nf-logout-button:hover {
-    background: #3b2523;
-    border-color: #57322f;
-}
-
-.nf-logout-button svg {
-    width: 18px;
-    height: 18px;
-}
-
-.nf-logout-button span {
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.nf-sidebar-footer {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 12px 3px 0;
-    color: var(--db-muted);
-    border-top: 1px solid var(--db-border);
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: .7px;
-}
-
 .nf-main {
     min-height: 100vh;
     margin-left: 252px;
+    transition: margin-left .3s cubic-bezier(.4,0,.2,1);
+}
+
+.nf-main.nf-sidebar-collapsed {
+    margin-left: 0;
 }
 
 .nf-topbar {
@@ -926,6 +563,15 @@ onMounted(() => {
     font-size: 10px;
 }
 
+.nf-status-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    background: #58b77b;
+    border-radius: 50%;
+}
+
 .nf-theme-toggle,
 .nf-icon-button {
     display: grid;
@@ -937,6 +583,7 @@ onMounted(() => {
     border: 1px solid var(--db-border);
     border-radius: 10px;
     font-size: 18px;
+    cursor: pointer;
     transition: color .15s ease, background .15s ease;
 }
 
@@ -946,9 +593,12 @@ onMounted(() => {
     background: var(--db-accent-soft);
 }
 
-.nf-mobile-menu,
-.nf-mobile-close {
+.nf-mobile-menu {
     display: none;
+}
+
+.nf-mobile-menu.nf-menu-visible {
+    display: grid;
 }
 
 .nf-content {
@@ -1029,7 +679,7 @@ onMounted(() => {
     font-size: 10px;
 }
 
-.nf-heading-date span:last-child {
+.nf-heading-date div span {
     color: var(--db-muted);
     font-size: 9px;
 }
@@ -1127,10 +777,10 @@ onMounted(() => {
 }
 
 .nf-stat-tag {
+    padding: 4px 6px;
     color: var(--db-text-soft);
     background: var(--db-surface-soft);
     border-radius: 5px;
-    padding: 4px 6px;
     font-size: 8px;
 }
 
@@ -1167,6 +817,7 @@ onMounted(() => {
 }
 
 .nf-select {
+    max-width: 115px;
     padding: 8px 10px;
     color: var(--db-text);
     background: var(--db-surface);
@@ -1205,7 +856,7 @@ onMounted(() => {
 .nf-chart-wrap {
     display: flex;
     gap: 12px;
-    height: 180px;
+    height: 165px;
     margin-top: 16px;
 }
 
@@ -1214,7 +865,6 @@ onMounted(() => {
     flex: 0 0 42px;
     flex-direction: column;
     justify-content: space-between;
-    padding: 0 0 2px;
     color: var(--db-muted);
     font-size: 9px;
     text-align: right;
@@ -1266,7 +916,7 @@ onMounted(() => {
     line-height: 1.6;
 }
 
-.nf-panel-footnote span {
+.nf-panel-footnote > span {
     color: var(--db-accent);
 }
 
@@ -1332,8 +982,12 @@ onMounted(() => {
 }
 
 .nf-outline-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 9px 11px;
     color: var(--db-accent);
+    text-decoration: none;
     background: var(--db-surface);
     border: 1px solid var(--db-border);
     border-radius: 8px;
@@ -1421,10 +1075,23 @@ onMounted(() => {
     font-size: 11px;
 }
 
-.nf-map-placeholder > span:last-child {
+.nf-map-placeholder > span:not(.nf-map-placeholder-icon) {
     color: var(--db-text-soft);
     font-size: 9px;
     line-height: 1.7;
+}
+
+.nf-map-link {
+    margin-top: 12px;
+    color: var(--db-accent);
+    font-size: 10px;
+    font-weight: 650;
+    text-decoration: none;
+}
+
+.nf-map-link:hover,
+.nf-weather-link:hover {
+    text-decoration: underline;
 }
 
 .nf-map-disclaimer {
@@ -1444,7 +1111,6 @@ onMounted(() => {
 
 .nf-weather-list {
     display: grid;
-    gap: 0;
     margin-top: 20px;
 }
 
@@ -1500,6 +1166,15 @@ onMounted(() => {
     font-size: 9px;
 }
 
+.nf-weather-link {
+    display: inline-block;
+    margin-top: 16px;
+    color: var(--db-accent);
+    font-size: 10px;
+    font-weight: 650;
+    text-decoration: none;
+}
+
 .nf-footer {
     display: flex;
     align-items: center;
@@ -1541,64 +1216,6 @@ onMounted(() => {
     letter-spacing: .9px;
 }
 
-.nf-placeholder-page {
-    display: flex;
-    align-items: center;
-    flex-direction: column;
-    min-height: 390px;
-    justify-content: center;
-    text-align: center;
-}
-
-.nf-placeholder-symbol {
-    display: grid;
-    width: 64px;
-    height: 64px;
-    place-items: center;
-    color: var(--db-accent);
-    background: var(--db-accent-soft);
-    border-radius: 18px;
-    font-size: 34px;
-}
-
-.nf-placeholder-page h2 {
-    margin: 22px 0 9px;
-    font-size: 21px;
-}
-
-.nf-placeholder-page > p {
-    max-width: 430px;
-    margin: 0;
-    color: var(--db-text-soft);
-    font-size: 12px;
-    line-height: 1.8;
-}
-
-.nf-placeholder-page .nf-placeholder-detail {
-    margin-top: 15px;
-    color: var(--db-muted);
-    font-size: 11px;
-}
-
-.nf-primary-button {
-    margin-top: 23px;
-    padding: 11px 16px;
-    color: #fff;
-    background: #287a50;
-    border: 0;
-    border-radius: 9px;
-    font-size: 11px;
-    font-weight: 650;
-}
-
-.nf-primary-button:hover {
-    background: #206642;
-}
-
-.nf-mobile-overlay {
-    display: none;
-}
-
 @media (min-width: 1500px) {
     .nf-content {
         padding-right: 48px;
@@ -1628,24 +1245,6 @@ onMounted(() => {
 }
 
 @media (max-width: 900px) {
-    .nf-sidebar {
-        transform: translateX(-100%);
-        box-shadow: none;
-    }
-
-    .nf-sidebar.nf-sidebar-open {
-        transform: translateX(0);
-        box-shadow: 15px 0 50px rgb(0 0 0 / 15%);
-    }
-
-    .nf-mobile-overlay {
-        position: fixed;
-        inset: 0;
-        z-index: 25;
-        display: block;
-        background: rgb(0 0 0 / 38%);
-    }
-
     .nf-main {
         margin-left: 0;
     }
@@ -1654,18 +1253,9 @@ onMounted(() => {
         display: grid;
     }
 
-    .nf-mobile-close {
-        display: grid;
-        margin-left: auto;
-    }
-
     .nf-primary-grid,
     .nf-secondary-grid {
         grid-template-columns: 1fr;
-    }
-
-    .nf-sidebar-note {
-        margin-top: 35px;
     }
 }
 

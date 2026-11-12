@@ -12,6 +12,16 @@
         @routes
         @vite(['resources/js/app.ts'])
         @inertiaHead
+        {{-- Script ini dijalankan sinkron sebelum CSS/Vue dimuat agar --}}
+        {{-- class tema langsung diterapkan tanpa flash/perubahan tampilan. --}}
+        <script>
+            (function () {
+                var t = localStorage.getItem('nusafire-theme');
+                var theme = (t === 'light' || t === 'dark') ? t : 'dark';
+                document.documentElement.classList.add('theme-' + theme);
+                document.documentElement.style.colorScheme = theme;
+            })();
+        </script>
     </head>
     <body class="font-sans antialiased">
         @inertia

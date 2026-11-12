@@ -1,14 +1,12 @@
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+
 import { Head, Link } from '@inertiajs/vue3';
 import { useTheme } from '@/composables/useTheme';
 
-const { theme, initializeTheme, toggleTheme } = useTheme();
+const { theme, toggleTheme } = useTheme();
 
-onMounted(() => {
-    initializeTheme();
-});
+
 </script>
 
 <template>
