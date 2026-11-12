@@ -1,0 +1,59 @@
+# Environment dan rahasia
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+vendor/
+.venv/
+venv/
+__pycache__/
+
+# Build dan cache
+dist/
+build/
+.cache/
+.pytest_cache/
+
+# IDE dan sistem operasi
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Environment dan rahasia
+.env
+.env.*
+!.env.example
+
+# Dependencies di semua folder
+**/node_modules/
+**/vendor/
+**/.venv/
+**/venv/
+**/__pycache__/
+
+# Build dan cache
+**/dist/
+**/build/
+**/.cache/
+**/.pytest_cache/
+
+# IDE dan OS
+.idea/
+.DS_Store
+Thumbs.db
+
+# Dependencies
+**/node_modules/
+**/vendor/
+
+# Environment variables and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Large datasets - keep locally, do not upload to GitHub
+**/data/nasa_power.csv
+**/data/firms_hotspots.csv
