@@ -15,18 +15,42 @@ import 'leaflet/dist/leaflet.css';
 import AppSidebar from '@/components/AppSidebar.vue';
 import { useTheme } from '@/composables/useTheme';
 
-type Confidence = 'low' | 'nominal' | 'high';
-
 type Hotspot = {
     id: number;
+    gridId: string;
+    location: string;
     latitude: number;
     longitude: number;
     date: string;
-    time: string;
-    confidence: Confidence;
-    frp: number;
-    satellite: string;
     region: string;
+    hotspotCount: number;
+    isFire: boolean;
+};
+
+type HotspotApiRow = {
+    DATE?: string;
+    GRID_ID?: string;
+    LOCATION?: string;
+    REGION?: string;
+    LATITUDE?: number | string;
+    LONGITUDE?: number | string;
+    hotspot_count?: number | string;
+    is_fire?: number | string | boolean;
+};
+
+type HotspotApiResponse = {
+    status?: string;
+    total?: number;
+    total_fire?: number;
+    total_non_fire?: number;
+    limit?: number;
+    offset?: number;
+    filter_status?: string;
+    returned?: number;
+    has_more?: boolean;
+    data?: HotspotApiRow[];
+    message?: string;
+    errors?: Record<string, string[]>;
 };
 
 const { theme, toggleTheme } = useTheme();
@@ -34,113 +58,113 @@ const { theme, toggleTheme } = useTheme();
 const mobileMenuOpen = ref(false);
 const sidebarCollapsed = ref(false);
 const mapElement = ref<HTMLDivElement | null>(null);
+
 const searchQuery = ref('');
 const selectedRegion = ref('all');
-const selectedConfidence = ref('all');
+const selectedStatus = ref<'all' | 'fire' | 'non-fire'>('all');
 const startDate = ref('');
 const endDate = ref('');
+
+const hotspots = ref<Hotspot[]>([]);
+const totalApiRecords = ref(0);
+const totalFireRecords = ref(0);
+const totalNonFireRecords = ref(0);
+const hasMore = ref(false);
+
 const selectedHotspot = ref<Hotspot | null>(null);
+const loading = ref(false);
 const mapReady = ref(false);
+const errorMessage = ref('');
 const copyMessage = ref('');
+
+const pageSize = 500;
+const currentOffset = ref(0);
+const requestVersion = ref(0);
 
 let map: L.Map | null = null;
 let markerLayer: L.LayerGroup | null = null;
 let copyMessageTimeout: ReturnType<typeof setTimeout> | null = null;
+let requestController: AbortController | null = null;
 
-const hotspots = ref<Hotspot[]>([
-    { id: 1, latitude: -0.7893, longitude: 100.65, date: '2026-11-02', time: '02:15', confidence: 'high', frp: 45.6, satellite: 'SNPP', region: 'Sumatra' },
-    { id: 2, latitude: -1.42, longitude: 102.1, date: '2026-11-02', time: '03:40', confidence: 'nominal', frp: 18.2, satellite: 'NOAA-20', region: 'Sumatra' },
-    { id: 3, latitude: -2.15, longitude: 113.85, date: '2026-11-01', time: '04:20', confidence: 'high', frp: 67.8, satellite: 'SNPP', region: 'Kalimantan' },
-    { id: 4, latitude: -0.5, longitude: 114.25, date: '2026-11-01', time: '05:10', confidence: 'low', frp: 8.4, satellite: 'NOAA-20', region: 'Kalimantan' },
-    { id: 5, latitude: -2.85, longitude: 116.1, date: '2026-10-31', time: '06:30', confidence: 'nominal', frp: 23.1, satellite: 'NOAA-21', region: 'Kalimantan' },
-    { id: 6, latitude: -3.8, longitude: 119.9, date: '2026-10-31', time: '07:15', confidence: 'high', frp: 51.3, satellite: 'SNPP', region: 'Sulawesi' },
-    { id: 7, latitude: -1.2, longitude: 120.4, date: '2026-10-30', time: '08:05', confidence: 'low', frp: 5.7, satellite: 'NOAA-20', region: 'Sulawesi' },
-    { id: 8, latitude: -4.2, longitude: 138.1, date: '2026-10-30', time: '09:25', confidence: 'nominal', frp: 29.6, satellite: 'NOAA-21', region: 'Papua' },
-    { id: 9, latitude: -3.1, longitude: 140.5, date: '2026-10-29', time: '10:40', confidence: 'high', frp: 72.4, satellite: 'SNPP', region: 'Papua' },
-    { id: 10, latitude: -0.9, longitude: 101.3, date: '2026-10-29', time: '11:20', confidence: 'nominal', frp: 14.9, satellite: 'NOAA-20', region: 'Sumatra' },
-    { id: 11, latitude: -1.8, longitude: 110.8, date: '2026-10-28', time: '12:10', confidence: 'low', frp: 6.2, satellite: 'NOAA-21', region: 'Kalimantan' },
-    { id: 12, latitude: -5.1, longitude: 122.6, date: '2026-10-28', time: '13:45', confidence: 'high', frp: 38.7, satellite: 'SNPP', region: 'Sulawesi' },
-]);
+const regions = [
+    'Sumatra',
+    'Java-Bali-Nusa Tenggara',
+    'Kalimantan',
+    'Sulawesi',
+    'Maluku',
+    'Papua',
+];
 
-const regions = computed(() =>
-    [...new Set(hotspots.value.map((item) => item.region))].sort(),
+const currentPage = computed(
+    () => Math.floor(currentOffset.value / pageSize) + 1,
+);
+
+const totalPages = computed(
+    () => Math.ceil(totalApiRecords.value / pageSize),
+);
+
+const pageStart = computed(() =>
+    totalApiRecords.value === 0 ? 0 : currentOffset.value + 1,
+);
+
+const pageEnd = computed(() =>
+    Math.min(
+        currentOffset.value + hotspots.value.length,
+        totalApiRecords.value,
+    ),
 );
 
 const filteredHotspots = computed(() => {
     const query = searchQuery.value.trim().toLowerCase();
 
-    return hotspots.value.filter((item) => {
-        const matchesRegion =
-            selectedRegion.value === 'all' ||
-            item.region === selectedRegion.value;
+    if (!query) return hotspots.value;
 
-        const matchesConfidence =
-            selectedConfidence.value === 'all' ||
-            item.confidence === selectedConfidence.value;
-
-        const matchesSearch =
-            !query ||
-            [
-                item.region,
-                item.satellite,
-                item.date,
-                String(item.id),
-                String(item.latitude),
-                String(item.longitude),
-            ].some((value) => value.toLowerCase().includes(query));
-
-        const matchesStart = !startDate.value || item.date >= startDate.value;
-        const matchesEnd = !endDate.value || item.date <= endDate.value;
-
-        return matchesRegion && matchesConfidence &&
-            matchesSearch && matchesStart && matchesEnd;
-    });
+    return hotspots.value.filter((item) =>
+        [
+            item.gridId,
+            item.location,
+            item.region,
+            item.date,
+            String(item.id),
+            String(item.latitude),
+            String(item.longitude),
+        ].some((value) => value.toLowerCase().includes(query)),
+    );
 });
 
+const totalHotspots = computed(() =>
+    selectedStatus.value === 'non-fire' ? 0 : totalFireRecords.value,
+);
+
+const totalNonFire = computed(() =>
+    selectedStatus.value === 'fire' ? 0 : totalNonFireRecords.value,
+);
+
+const totalGridRecords = computed(() => totalApiRecords.value);
+
 const dateRangeInvalid = computed(
-    () => Boolean(startDate.value && endDate.value) &&
+    () =>
+        Boolean(startDate.value && endDate.value) &&
         startDate.value > endDate.value,
 );
 
-const totalHotspots = computed(() => filteredHotspots.value.length);
-
-const highConfidenceCount = computed(
-    () => filteredHotspots.value.filter(
-        (item) => item.confidence === 'high',
-    ).length,
-);
-
-const totalRegions = computed(
-    () => new Set(filteredHotspots.value.map((item) => item.region)).size,
-);
-
-const averageFrp = computed(() => {
-    const items = filteredHotspots.value;
-    return items.length
-        ? items.reduce((sum, item) => sum + item.frp, 0) / items.length
-        : 0;
-});
-
-function confidenceLabel(value: Confidence): string {
-    return {
-        low: 'Rendah',
-        nominal: 'Sedang',
-        high: 'Tinggi',
-    }[value];
+function statusLabel(isFire: boolean): string {
+    return isFire ? 'Fire' : 'Non-fire';
 }
 
-function confidenceColor(value: Confidence): string {
-    return {
-        low: '#3b82f6',
-        nominal: '#f59e0b',
-        high: '#ef4444',
-    }[value];
+function statusColor(isFire: boolean): string {
+    return isFire ? '#ef4444' : '#3b82f6';
 }
 
-function createMarkerIcon(value: Confidence): L.DivIcon {
+function createMarkerIcon(isFire: boolean): L.DivIcon {
     return L.divIcon({
         className: 'nf-hotspot-marker-wrapper',
-        html: `<div class="nf-hotspot-marker" style="--marker-color:${confidenceColor(value)}"><span></span></div>`,
+        html: `
+            <div class="nf-hotspot-marker"
+                 style="--marker-color:${statusColor(isFire)}">
+                <span></span>
+            </div>
+        `,
         iconSize: [24, 24],
         iconAnchor: [12, 12],
         popupAnchor: [0, -12],
@@ -159,14 +183,54 @@ function escapeHtml(value: string | number): string {
 function popupContent(item: Hotspot): string {
     return `
         <div class="nf-hotspot-popup">
-            <strong>Hotspot #${item.id}</strong>
+            <strong>${escapeHtml(item.gridId)}</strong>
             <p>Wilayah: ${escapeHtml(item.region)}</p>
+            <p>Lokasi: ${escapeHtml(item.location)}</p>
             <p>Tanggal: ${escapeHtml(item.date)}</p>
-            <p>Waktu: ${escapeHtml(item.time)}</p>
-            <p>Confidence: ${confidenceLabel(item.confidence)}</p>
-            <p>FRP: ${item.frp.toFixed(1)} MW</p>
+            <p>Status data: ${statusLabel(item.isFire)}</p>
+            <p>Jumlah hotspot: ${item.hotspotCount}</p>
+            <p>Latitude: ${item.latitude}</p>
+            <p>Longitude: ${item.longitude}</p>
         </div>
     `;
+}
+
+function normalizeHotspot(
+    row: HotspotApiRow,
+    index: number,
+): Hotspot | null {
+    const latitude = Number(row.LATITUDE);
+    const longitude = Number(row.LONGITUDE);
+    const hotspotCount = Number(row.hotspot_count);
+    const rawStatus = row.is_fire;
+
+    if (
+        row.LATITUDE === null ||
+        row.LATITUDE === undefined ||
+        row.LONGITUDE === null ||
+        row.LONGITUDE === undefined ||
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180 ||
+        ![0, 1, true, false, '0', '1'].includes(rawStatus as never)
+    ) {
+        return null;
+    }
+
+    return {
+        id: currentOffset.value + index + 1,
+        gridId: String(row.GRID_ID ?? 'Tidak diketahui'),
+        location: String(row.LOCATION ?? 'Tidak diketahui'),
+        latitude,
+        longitude,
+        date: String(row.DATE ?? '').slice(0, 10),
+        region: String(row.REGION ?? 'Tidak diketahui'),
+        hotspotCount: Number.isFinite(hotspotCount) ? hotspotCount : 0,
+        isFire: rawStatus === true || Number(rawStatus) === 1,
+    };
 }
 
 function renderMarkers(): void {
@@ -174,10 +238,10 @@ function renderMarkers(): void {
 
     markerLayer.clearLayers();
 
-    filteredHotspots.value.forEach((item) => {
+    for (const item of filteredHotspots.value) {
         const marker = L.marker(
             [item.latitude, item.longitude],
-            { icon: createMarkerIcon(item.confidence) },
+            { icon: createMarkerIcon(item.isFire) },
         );
 
         marker.bindPopup(popupContent(item));
@@ -186,8 +250,8 @@ function renderMarkers(): void {
             selectedHotspot.value = item;
         });
 
-        markerLayer?.addLayer(marker);
-    });
+        markerLayer.addLayer(marker);
+    }
 }
 
 function initializeMap(): void {
@@ -207,10 +271,159 @@ function initializeMap(): void {
     }).addTo(map);
 
     markerLayer = L.layerGroup().addTo(map);
-    renderMarkers();
     mapReady.value = true;
 
     nextTick(() => map?.invalidateSize());
+}
+
+async function loadHotspots(): Promise<void> {
+    if (dateRangeInvalid.value) {
+        errorMessage.value =
+            'Tanggal mulai tidak boleh melebihi tanggal akhir.';
+        return;
+    }
+
+    requestController?.abort();
+
+    const controller = new AbortController();
+    requestController = controller;
+
+    const thisRequest = ++requestVersion.value;
+
+    loading.value = true;
+    errorMessage.value = '';
+
+    const params = new URLSearchParams({
+        status: selectedStatus.value,
+        limit: String(pageSize),
+        offset: String(currentOffset.value),
+    });
+
+    if (selectedRegion.value !== 'all') {
+        params.set('region', selectedRegion.value);
+    }
+
+    if (startDate.value) {
+        params.set('start_date', startDate.value);
+    }
+
+    if (endDate.value) {
+        params.set('end_date', endDate.value);
+    }
+
+    try {
+        const response = await fetch(
+            `/internal/ai/hotspots?${params.toString()}`,
+            {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                signal: controller.signal,
+            },
+        );
+
+        const result = await response.json().catch(() => null) as
+            | HotspotApiResponse
+            | null;
+
+        if (!response.ok) {
+            const validationMessage = result?.errors
+                ? Object.values(result.errors).flat().join(' ')
+                : '';
+
+            throw new Error(
+                validationMessage ||
+                result?.message ||
+                `Permintaan data gagal (HTTP ${response.status}).`,
+            );
+        }
+
+        if (
+            !result ||
+            result.status !== 'success' ||
+            !Array.isArray(result.data)
+        ) {
+            throw new Error(
+                'Format respons API tidak sesuai atau data hotspot tidak ditemukan.',
+            );
+        }
+
+        if (thisRequest !== requestVersion.value) return;
+
+        hotspots.value = result.data
+            .map((row, index) => normalizeHotspot(row, index))
+            .filter((item): item is Hotspot => item !== null);
+
+        totalApiRecords.value = Number(result.total ?? 0);
+        totalFireRecords.value = Number(result.total_fire ?? 0);
+        totalNonFireRecords.value = Number(result.total_non_fire ?? 0);
+        hasMore.value = Boolean(result.has_more);
+
+        if (hotspots.value.length === 0 && totalApiRecords.value > 0) {
+            errorMessage.value =
+                'Data tersedia, tetapi tidak ada koordinat atau status yang valid pada halaman ini.';
+        }
+    } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        if (thisRequest !== requestVersion.value) return;
+
+        console.error('Gagal memuat data hotspot:', error);
+
+        errorMessage.value = error instanceof Error
+            ? error.message
+            : 'Terjadi kesalahan saat mengambil data hotspot.';
+    } finally {
+        if (thisRequest === requestVersion.value) {
+            loading.value = false;
+            renderMarkers();
+        }
+    }
+}
+
+function applyFilters(): void {
+    if (dateRangeInvalid.value) {
+        errorMessage.value =
+            'Tanggal mulai tidak boleh melebihi tanggal akhir.';
+        return;
+    }
+
+    currentOffset.value = 0;
+    selectedHotspot.value = null;
+    searchQuery.value = '';
+    void loadHotspots();
+}
+
+function resetFilters(): void {
+    searchQuery.value = '';
+    selectedRegion.value = 'all';
+    selectedStatus.value = 'all';
+    startDate.value = '';
+    endDate.value = '';
+    currentOffset.value = 0;
+    selectedHotspot.value = null;
+
+    void loadHotspots();
+}
+
+function nextPage(): void {
+    if (loading.value || !hasMore.value) return;
+
+    currentOffset.value += pageSize;
+    selectedHotspot.value = null;
+
+    void loadHotspots();
+}
+
+function previousPage(): void {
+    if (loading.value || currentOffset.value === 0) return;
+
+    currentOffset.value = Math.max(0, currentOffset.value - pageSize);
+    selectedHotspot.value = null;
+
+    void loadHotspots();
 }
 
 function focusHotspot(item: Hotspot): void {
@@ -233,15 +446,6 @@ function focusHotspot(item: Hotspot): void {
             layer.openPopup();
         }
     });
-}
-
-function resetFilters(): void {
-    searchQuery.value = '';
-    selectedRegion.value = 'all';
-    selectedConfidence.value = 'all';
-    startDate.value = '';
-    endDate.value = '';
-    selectedHotspot.value = null;
 }
 
 function showCopyMessage(message: string): void {
@@ -270,6 +474,7 @@ async function copyCoordinates(): Promise<void> {
             textarea.setAttribute('readonly', '');
             textarea.style.position = 'fixed';
             textarea.style.left = '-9999px';
+
             document.body.appendChild(textarea);
             textarea.select();
 
@@ -282,32 +487,41 @@ async function copyCoordinates(): Promise<void> {
         showCopyMessage('Koordinat berhasil disalin.');
     } catch (error) {
         console.error(error);
-        showCopyMessage('Gagal menyalin. Silakan salin koordinat secara manual.');
+        showCopyMessage('Gagal menyalin. Salin koordinat secara manual.');
     }
 }
 
 function exportCsv(): void {
     const headers = [
-        'ID', 'Latitude', 'Longitude', 'Tanggal', 'Waktu',
-        'Confidence', 'FRP (MW)', 'Satelit', 'Wilayah',
+        'ID',
+        'Grid ID',
+        'Lokasi',
+        'Latitude',
+        'Longitude',
+        'Tanggal',
+        'Wilayah',
+        'Jumlah Hotspot',
+        'Status Data',
     ];
 
     const rows = filteredHotspots.value.map((item) => [
         item.id,
+        item.gridId,
+        item.location,
         item.latitude,
         item.longitude,
         item.date,
-        item.time,
-        confidenceLabel(item.confidence),
-        item.frp,
-        item.satellite,
         item.region,
+        item.hotspotCount,
+        statusLabel(item.isFire),
     ]);
 
     const csv = [headers, ...rows]
-        .map((row) => row.map(
-            (value) => `"${String(value).replace(/"/g, '""')}"`,
-        ).join(','))
+        .map((row) =>
+            row.map((value) =>
+                `"${String(value).replace(/"/g, '""')}"`,
+            ).join(','),
+        )
         .join('\r\n');
 
     const blob = new Blob(['\uFEFF' + csv], {
@@ -318,7 +532,8 @@ function exportCsv(): void {
     const link = document.createElement('a');
 
     link.href = url;
-    link.download = `nusafire-hotspots-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download =
+        `nusafire-hotspots-${new Date().toISOString().slice(0, 10)}.csv`;
 
     document.body.appendChild(link);
     link.click();
@@ -327,29 +542,39 @@ function exportCsv(): void {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-watch(filteredHotspots, (items) => {
-    renderMarkers();
-
-    if (
-        selectedHotspot.value &&
-        !items.some((item) => item.id === selectedHotspot.value?.id)
-    ) {
+watch(
+    [selectedRegion, selectedStatus, startDate, endDate],
+    () => {
+        currentOffset.value = 0;
         selectedHotspot.value = null;
-    }
-}, { flush: 'post' });
+        void loadHotspots();
+    },
+);
 
-watch([startDate, endDate], ([start, end]) => {
-    if (start && end && start > end) {
-        showCopyMessage('Tanggal mulai tidak boleh melebihi tanggal akhir.');
-    }
-});
+watch(
+    filteredHotspots,
+    (items) => {
+        renderMarkers();
+
+        if (
+            selectedHotspot.value &&
+            !items.some((item) => item.id === selectedHotspot.value?.id)
+        ) {
+            selectedHotspot.value = null;
+        }
+    },
+    { flush: 'post' },
+);
 
 onMounted(async () => {
     await nextTick();
     initializeMap();
+    await loadHotspots();
 });
 
 onBeforeUnmount(() => {
+    requestController?.abort();
+
     if (copyMessageTimeout) clearTimeout(copyMessageTimeout);
 
     map?.remove();
@@ -362,7 +587,6 @@ onBeforeUnmount(() => {
     <Head title="Hotspot Map | NusaFire" />
 
     <main class="nf-app nf-hotspotmap" :class="`theme-${theme}`">
-        <!-- Sidebar hanya berasal dari komponen bersama. -->
         <AppSidebar
             active-page="hotspot-map"
             :mobile-open="mobileMenuOpen"
@@ -370,12 +594,14 @@ onBeforeUnmount(() => {
             @close="mobileMenuOpen = false"
         />
 
-        <div class="nf-main" :class="{ 'nf-sidebar-collapsed': sidebarCollapsed }">
+        <div
+            class="nf-main"
+            :class="{ 'nf-sidebar-collapsed': sidebarCollapsed }"
+        >
             <header class="nf-topbar">
                 <div class="nf-topbar-left">
                     <button
                         class="nf-icon-button nf-mobile-menu"
-                        :class="{ 'nf-menu-visible': sidebarCollapsed }"
                         type="button"
                         aria-label="Buka navigasi"
                         @click="sidebarCollapsed = false; mobileMenuOpen = true"
@@ -411,16 +637,22 @@ onBeforeUnmount(() => {
                 <section class="nf-page-heading">
                     <div>
                         <div class="nf-eyebrow">
-                            <span></span> MONITORING KEBAKARAN
+                            <span></span>
+                            MONITORING KEBAKARAN
                         </div>
                         <h2>Pemetaan Titik Panas</h2>
                         <p>
-                            Pantau persebaran hotspot dan analisis informasi
-                            berdasarkan wilayah, tanggal, dan confidence.
+                            Pantau data grid hotspot berdasarkan koordinat,
+                            wilayah, tanggal, dan status klasifikasi.
                         </p>
                     </div>
 
-                    <button class="nf-button nf-button-primary" type="button" @click="exportCsv">
+                    <button
+                        class="nf-button nf-button-primary"
+                        type="button"
+                        :disabled="filteredHotspots.length === 0"
+                        @click="exportCsv"
+                    >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                             <path d="M12 3v12m-5-5 5 5 5-5M5 17v3h14v-3" />
                         </svg>
@@ -428,156 +660,92 @@ onBeforeUnmount(() => {
                     </button>
                 </section>
 
+                <div v-if="errorMessage" class="nf-alert" role="alert">
+                    <strong>Data hotspot bermasalah.</strong>
+                    <span>{{ errorMessage }}</span>
+                    <button
+                        class="nf-retry-button"
+                        type="button"
+                        :disabled="loading"
+                        @click="loadHotspots"
+                    >
+                        {{ loading ? 'Memuat...' : 'Coba lagi' }}
+                    </button>
+                </div>
+
+                <!-- RINGKASAN INFORMASI -->
                 <section class="nf-stats-grid">
                     <article class="nf-card nf-stat-card">
                         <div class="nf-stat-heading">
-                            <span class="nf-stat-icon red">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <path d="M12 22c4.4 0 7-3 7-7 0-2.8-1.5-4.5-3.5-7-.2 2-1 3-2 3.5C13.5 7.5 10.5 4 8 2c.5 4-1 6-2.5 8.5A9 9 0 0 0 5 15c0 4 2.8 7 7 7Z" />
-                                </svg>
-                            </span>
-                            <span>Total Hotspot</span>
+                            <span class="nf-stat-icon red">🔥</span>
+                            <span>Record Fire</span>
                         </div>
-                        <div class="nf-stat-value">{{ totalHotspots }}</div>
-                        <p>Sesuai filter yang dipilih</p>
+                        <div class="nf-stat-value">
+                            {{ loading ? '—' : totalHotspots.toLocaleString('id-ID') }}
+                        </div>
+                        <p>Total record fire sesuai filter server.</p>
                     </article>
 
                     <article class="nf-card nf-stat-card">
                         <div class="nf-stat-heading">
-                            <span class="nf-stat-icon orange">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <path d="M12 3 22 20H2L12 3Z" />
-                                    <path d="M12 9v5m0 3h.01" />
-                                </svg>
-                            </span>
-                            <span>Confidence Tinggi</span>
+                            <span class="nf-stat-icon blue">○</span>
+                            <span>Record Non-fire</span>
                         </div>
-                        <div class="nf-stat-value">{{ highConfidenceCount }}</div>
-                        <p>Hotspot dengan confidence tinggi</p>
+                        <div class="nf-stat-value">
+                            {{ loading ? '—' : totalNonFire.toLocaleString('id-ID') }}
+                        </div>
+                        <p>Total record non-fire sesuai filter server.</p>
                     </article>
 
                     <article class="nf-card nf-stat-card">
                         <div class="nf-stat-heading">
-                            <span class="nf-stat-icon blue">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <path d="M3 10.5 12 3l9 7.5V21H3V10.5Z" />
-                                    <path d="M9 21v-7h6v7" />
-                                </svg>
-                            </span>
-                            <span>Wilayah Terdeteksi</span>
+                            <span class="nf-stat-icon green">⌖</span>
+                            <span>Wilayah Tersedia</span>
                         </div>
-                        <div class="nf-stat-value">{{ totalRegions }}</div>
-                        <p>Wilayah dalam hasil filter</p>
+                        <div class="nf-stat-value">
+                            {{ selectedRegion === 'all' ? regions.length : 1 }}
+                        </div>
+                        <p>
+                            {{ selectedRegion === 'all' ? 'Daftar wilayah dataset' : selectedRegion }}
+                        </p>
                     </article>
 
                     <article class="nf-card nf-stat-card">
                         <div class="nf-stat-heading">
-                            <span class="nf-stat-icon green">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <path d="M3 17 9 11l4 4 8-9" />
-                                    <path d="M15 6h6v6" />
-                                </svg>
-                            </span>
-                            <span>Rata-rata FRP</span>
+                            <span class="nf-stat-icon orange">▦</span>
+                            <span>Total Record</span>
                         </div>
-                        <div class="nf-stat-value">{{ averageFrp.toFixed(1) }} <small>MW</small></div>
-                        <p>Fire Radiative Power rata-rata</p>
+                        <div class="nf-stat-value">
+                            {{ loading ? '—' : totalGridRecords.toLocaleString('id-ID') }}
+                        </div>
+                        <p>Total data yang cocok dengan filter server.</p>
                     </article>
                 </section>
 
-                <section class="nf-main-grid">
-                    <article class="nf-card nf-panel">
-                        <div class="nf-section-heading">
-                            <div>
-                                <h3>Peta Persebaran Hotspot</h3>
-                                <p>Klik marker untuk melihat detail titik panas.</p>
-                            </div>
-                            <span class="nf-count">{{ filteredHotspots.length }} titik</span>
-                        </div>
-
-                        <div class="nf-legend">
-                            <span><i class="high"></i>Tinggi</span>
-                            <span><i class="nominal"></i>Sedang</span>
-                            <span><i class="low"></i>Rendah</span>
-                        </div>
-
-                        <div class="nf-map-wrap">
-                            <div ref="mapElement" class="nf-leaflet-map"></div>
-                            <div v-if="!mapReady" class="nf-map-message">Memuat peta...</div>
-                            <div v-else-if="filteredHotspots.length === 0" class="nf-map-message">
-                                Tidak ada hotspot yang sesuai dengan filter.
-                            </div>
-                        </div>
-
-                        <div class="nf-map-footer">
-                            <span><i></i>Peta OpenStreetMap</span>
-                            <span>Koordinat derajat desimal</span>
-                        </div>
-                    </article>
-
-                    <article class="nf-card nf-panel nf-detail-panel">
-                        <div class="nf-section-heading">
-                            <div>
-                                <h3>Detail Hotspot</h3>
-                                <p>Informasi titik yang dipilih.</p>
-                            </div>
-                        </div>
-
-                        <template v-if="selectedHotspot">
-                            <div class="nf-detail-hero">
-                                <span class="nf-stat-icon red">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                        <path d="M12 22c4.4 0 7-3 7-7-0-2.8-1.5-4.5-3.5-7-.2 2-1 3-2 3.5C13.5 7.5 10.5 4 8 2c.5 4-1 6-2.5 8.5A9 9 0 0 0 5 15c0 4 2.8 7 7 7Z" />
-                                    </svg>
-                                </span>
-                                <div>
-                                    <small>HOTSPOT #{{ selectedHotspot.id }}</small>
-                                    <h4>{{ selectedHotspot.region }}</h4>
-                                    <span class="nf-confidence" :class="`confidence-${selectedHotspot.confidence}`">
-                                        {{ confidenceLabel(selectedHotspot.confidence) }} confidence
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="nf-detail-list">
-                                <div><span>Tanggal deteksi</span><strong>{{ selectedHotspot.date }}</strong></div>
-                                <div><span>Waktu deteksi</span><strong>{{ selectedHotspot.time }}</strong></div>
-                                <div><span>Latitude</span><strong>{{ selectedHotspot.latitude.toFixed(4) }}</strong></div>
-                                <div><span>Longitude</span><strong>{{ selectedHotspot.longitude.toFixed(4) }}</strong></div>
-                                <div><span>FRP</span><strong>{{ selectedHotspot.frp.toFixed(1) }} MW</strong></div>
-                                <div><span>Satelit</span><strong>{{ selectedHotspot.satellite }}</strong></div>
-                            </div>
-
-                            <button class="nf-button nf-button-outline nf-full-button" type="button" @click="copyCoordinates">
-                                Salin koordinat
-                            </button>
-                            <p v-if="copyMessage" class="nf-copy-message" role="status">{{ copyMessage }}</p>
-                        </template>
-
-                        <div v-else class="nf-empty-state">
-                            <span class="nf-empty-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
-                                    <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
-                                    <circle cx="12" cy="10" r="2.5" />
-                                </svg>
-                            </span>
-                            <h4>Belum ada titik dipilih</h4>
-                            <p>Pilih marker pada peta atau klik tombol Lihat pada tabel.</p>
-                        </div>
-
-                        <div class="nf-note">
-                            Data pada halaman ini merupakan data contoh untuk pengembangan antarmuka, bukan data aktual.
-                        </div>
-                    </article>
-                </section>
-
+                <!-- FILTER DIPINDAHKAN KE ATAS PETA -->
                 <section class="nf-card nf-panel nf-filter-panel">
                     <div class="nf-section-heading">
                         <div>
-                            <h3>Filter Data Hotspot</h3>
-                            <p>Saring data berdasarkan kriteria yang diperlukan.</p>
+                            <div class="nf-filter-title">
+                                <span class="nf-filter-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                        <path d="M4 5h16M7 12h10m-7 7h4" />
+                                    </svg>
+                                </span>
+                                <h3>Filter Data Hotspot</h3>
+                            </div>
+                            <p>
+                                Atur filter di sini, lalu lihat hasilnya langsung
+                                pada peta dan tabel di bawah.
+                            </p>
                         </div>
-                        <button class="nf-button nf-button-outline" type="button" @click="resetFilters">
+
+                        <button
+                            class="nf-button nf-button-outline"
+                            type="button"
+                            :disabled="loading"
+                            @click="resetFilters"
+                        >
                             Reset filter
                         </button>
                     </div>
@@ -586,51 +754,197 @@ onBeforeUnmount(() => {
                         Tanggal mulai tidak boleh melebihi tanggal akhir.
                     </p>
 
-                    <div class="nf-filter-grid">
-                        <label class="nf-field nf-search-field">
-                            <span>Cari hotspot</span>
-                            <input v-model="searchQuery" type="search" placeholder="ID, wilayah, satelit..." />
+                    <form class="nf-filter-grid" @submit.prevent="applyFilters">
+                        <label class="nf-field">
+                            <span>Cari data pada halaman ini</span>
+                            <input
+                                v-model="searchQuery"
+                                type="search"
+                                placeholder="Grid ID, lokasi, wilayah..."
+                            />
                         </label>
 
                         <label class="nf-field">
                             <span>Wilayah</span>
                             <select v-model="selectedRegion">
                                 <option value="all">Semua wilayah</option>
-                                <option v-for="region in regions" :key="region" :value="region">
+                                <option
+                                    v-for="region in regions"
+                                    :key="region"
+                                    :value="region"
+                                >
                                     {{ region }}
                                 </option>
                             </select>
                         </label>
 
                         <label class="nf-field">
-                            <span>Confidence</span>
-                            <select v-model="selectedConfidence">
-                                <option value="all">Semua tingkat</option>
-                                <option value="high">Tinggi</option>
-                                <option value="nominal">Sedang</option>
-                                <option value="low">Rendah</option>
+                            <span>Status data</span>
+                            <select v-model="selectedStatus">
+                                <option value="all">Semua status</option>
+                                <option value="fire">Fire</option>
+                                <option value="non-fire">Non-fire</option>
                             </select>
                         </label>
 
                         <label class="nf-field">
                             <span>Tanggal mulai</span>
-                            <input v-model="startDate" type="date" :max="endDate || undefined" />
+                            <input
+                                v-model="startDate"
+                                type="date"
+                                :max="endDate || undefined"
+                            />
                         </label>
 
                         <label class="nf-field">
                             <span>Tanggal akhir</span>
-                            <input v-model="endDate" type="date" :min="startDate || undefined" />
+                            <input
+                                v-model="endDate"
+                                type="date"
+                                :min="startDate || undefined"
+                            />
                         </label>
-                    </div>
+
+                        <div class="nf-filter-actions">
+                            <span class="nf-filter-hint">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <circle cx="12" cy="12" r="9" />
+                                    <path d="M12 11v5m0-8h.01" />
+                                </svg>
+                                Filter tanggal, wilayah, dan status diterapkan ke server.
+                            </span>
+
+                            <button
+                                class="nf-button nf-button-primary nf-apply-button"
+                                type="submit"
+                                :disabled="loading || dateRangeInvalid"
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <circle cx="10.5" cy="10.5" r="6.5" />
+                                    <path d="m16 16 4 4" />
+                                </svg>
+                                {{ loading ? 'Memuat data...' : 'Terapkan filter' }}
+                            </button>
+                        </div>
+                    </form>
                 </section>
 
+                <!-- PETA DAN DETAIL -->
+                <section class="nf-main-grid">
+                    <article class="nf-card nf-panel">
+                        <div class="nf-section-heading">
+                            <div>
+                                <h3>Peta Persebaran Hotspot</h3>
+                                <p>Klik marker untuk melihat informasi record.</p>
+                            </div>
+                            <span class="nf-count">
+                                {{ filteredHotspots.length.toLocaleString('id-ID') }} marker
+                            </span>
+                        </div>
+
+                        <div class="nf-legend">
+                            <span><i class="high"></i> Fire</span>
+                            <span><i class="low"></i> Non-fire</span>
+                        </div>
+
+                        <div class="nf-map-wrap">
+                            <div ref="mapElement" class="nf-leaflet-map"></div>
+
+                            <div v-if="loading" class="nf-map-message">
+                                Memuat data hotspot...
+                            </div>
+                            <div v-else-if="errorMessage" class="nf-map-message">
+                                {{ errorMessage }}
+                            </div>
+                            <div v-else-if="filteredHotspots.length === 0" class="nf-map-message">
+                                Tidak ada data yang sesuai.
+                            </div>
+                        </div>
+
+                        <div class="nf-map-footer">
+                            <span><i></i> Peta OpenStreetMap</span>
+                            <span>Koordinat derajat desimal</span>
+                        </div>
+                    </article>
+
+                    <article class="nf-card nf-panel nf-detail-panel">
+                        <div class="nf-section-heading">
+                            <div>
+                                <h3>Detail Hotspot</h3>
+                                <p>Informasi record yang dipilih.</p>
+                            </div>
+                        </div>
+
+                        <template v-if="selectedHotspot">
+                            <div class="nf-detail-hero">
+                                <span
+                                    class="nf-stat-icon"
+                                    :class="selectedHotspot.isFire ? 'red' : 'blue'"
+                                >
+                                    {{ selectedHotspot.isFire ? '🔥' : '○' }}
+                                </span>
+                                <div>
+                                    <small>RECORD #{{ selectedHotspot.id }}</small>
+                                    <h4>{{ selectedHotspot.region }}</h4>
+                                    <span
+                                        class="nf-confidence"
+                                        :class="selectedHotspot.isFire ? 'confidence-high' : 'confidence-low'"
+                                    >
+                                        {{ statusLabel(selectedHotspot.isFire) }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="nf-detail-list">
+                                <div><span>Grid ID</span><strong>{{ selectedHotspot.gridId }}</strong></div>
+                                <div><span>Lokasi</span><strong>{{ selectedHotspot.location }}</strong></div>
+                                <div><span>Wilayah</span><strong>{{ selectedHotspot.region }}</strong></div>
+                                <div><span>Tanggal</span><strong>{{ selectedHotspot.date }}</strong></div>
+                                <div><span>Latitude</span><strong>{{ selectedHotspot.latitude.toFixed(5) }}</strong></div>
+                                <div><span>Longitude</span><strong>{{ selectedHotspot.longitude.toFixed(5) }}</strong></div>
+                                <div><span>Jumlah hotspot</span><strong>{{ selectedHotspot.hotspotCount }}</strong></div>
+                                <div><span>Status data</span><strong>{{ statusLabel(selectedHotspot.isFire) }}</strong></div>
+                            </div>
+
+                            <button
+                                class="nf-button nf-button-outline nf-full-button"
+                                type="button"
+                                @click="copyCoordinates"
+                            >
+                                Salin koordinat
+                            </button>
+
+                            <p v-if="copyMessage" class="nf-copy-message" role="status">
+                                {{ copyMessage }}
+                            </p>
+                        </template>
+
+                        <div v-else class="nf-empty-state">
+                            <span class="nf-empty-icon">⌖</span>
+                            <h4>Belum ada titik dipilih</h4>
+                            <p>Pilih marker pada peta atau tekan tombol Lihat pada tabel.</p>
+                        </div>
+
+                        <div class="nf-note">
+                            Satu record merepresentasikan data grid/tanggal, bukan selalu
+                            satu deteksi api individual. Status fire/non-fire mengikuti
+                            label dataset.
+                        </div>
+                    </article>
+                </section>
+
+                <!-- TABEL TETAP DI BAWAH PETA -->
                 <section class="nf-card nf-panel nf-table-panel">
                     <div class="nf-section-heading">
                         <div>
-                            <h3>Data Hotspot</h3>
-                            <p>Daftar titik panas berdasarkan hasil filter.</p>
+                            <h3>Daftar Data Hotspot</h3>
+                            <p>
+                                Data pada tabel mengikuti filter yang diterapkan di atas.
+                            </p>
                         </div>
-                        <span class="nf-count">{{ filteredHotspots.length }} data</span>
+                        <span class="nf-count">
+                            {{ filteredHotspots.length.toLocaleString('id-ID') }} data tampil
+                        </span>
                     </div>
 
                     <div class="nf-table-scroll">
@@ -638,15 +952,16 @@ onBeforeUnmount(() => {
                             <thead>
                                 <tr>
                                     <th>ID</th>
+                                    <th>Grid ID</th>
                                     <th>Wilayah</th>
                                     <th>Koordinat</th>
                                     <th>Tanggal</th>
-                                    <th>Confidence</th>
-                                    <th>FRP (MW)</th>
-                                    <th>Satelit</th>
+                                    <th>Jumlah Hotspot</th>
+                                    <th>Status</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
+
                             <tbody>
                                 <tr
                                     v-for="item in filteredHotspots"
@@ -654,39 +969,81 @@ onBeforeUnmount(() => {
                                     :class="{ 'is-selected': selectedHotspot?.id === item.id }"
                                 >
                                     <td class="nf-id-cell">#{{ item.id }}</td>
+                                    <td>{{ item.gridId }}</td>
                                     <td>{{ item.region }}</td>
-                                    <td>{{ item.latitude.toFixed(3) }}, {{ item.longitude.toFixed(3) }}</td>
-                                    <td>{{ item.date }}</td>
                                     <td>
-                                        <span class="nf-confidence" :class="`confidence-${item.confidence}`">
-                                            {{ confidenceLabel(item.confidence) }}
+                                        {{ item.latitude.toFixed(3) }},
+                                        {{ item.longitude.toFixed(3) }}
+                                    </td>
+                                    <td>{{ item.date }}</td>
+                                    <td>{{ item.hotspotCount }}</td>
+                                    <td>
+                                        <span
+                                            class="nf-confidence"
+                                            :class="item.isFire ? 'confidence-high' : 'confidence-low'"
+                                        >
+                                            {{ statusLabel(item.isFire) }}
                                         </span>
                                     </td>
-                                    <td>{{ item.frp.toFixed(1) }}</td>
-                                    <td>{{ item.satellite }}</td>
                                     <td>
-                                        <button class="nf-view-button" type="button" @click="focusHotspot(item)">
+                                        <button
+                                            class="nf-view-button"
+                                            type="button"
+                                            @click="focusHotspot(item)"
+                                        >
                                             Lihat
                                         </button>
                                     </td>
                                 </tr>
+
                                 <tr v-if="filteredHotspots.length === 0">
                                     <td colspan="8" class="nf-empty-table">
-                                        Tidak ada data yang sesuai dengan filter.
+                                        {{ loading ? 'Sedang memuat data...' : 'Tidak ada data yang sesuai.' }}
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="nf-table-footer">
-                        Menampilkan {{ filteredHotspots.length }} dari {{ hotspots.length }} data hotspot
+                    <div class="nf-pagination">
+                        <div>
+                            Menampilkan
+                            {{ pageStart.toLocaleString('id-ID') }}–{{ pageEnd.toLocaleString('id-ID') }}
+                            dari {{ totalApiRecords.toLocaleString('id-ID') }} record.
+                            <span v-if="searchQuery">
+                                Pencarian lokal: {{ filteredHotspots.length }} hasil pada halaman ini.
+                            </span>
+                        </div>
+
+                        <div class="nf-pagination-controls">
+                            <button
+                                class="nf-button nf-button-outline"
+                                type="button"
+                                :disabled="loading || currentOffset === 0"
+                                @click="previousPage"
+                            >
+                                ← Sebelumnya
+                            </button>
+
+                            <span>
+                                Halaman {{ currentPage }} dari {{ Math.max(totalPages, 1) }}
+                            </span>
+
+                            <button
+                                class="nf-button nf-button-outline"
+                                type="button"
+                                :disabled="loading || !hasMore"
+                                @click="nextPage"
+                            >
+                                Berikutnya →
+                            </button>
+                        </div>
                     </div>
                 </section>
 
                 <footer class="nf-page-footer">
                     <span>NusaFire · Monitoring dan Analisis Hotspot</span>
-                    <span>Data contoh untuk pengembangan antarmuka</span>
+                    <span>Data bersumber dari API NusaFire</span>
                 </footer>
             </div>
         </div>
@@ -694,29 +1051,15 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
-/* Variabel halaman ini — scope ke .nf-hotspotmap agar tidak tabrakan dengan Dashboard */
 .nf-app.nf-hotspotmap {
-    /* Palet dasar — identik dengan Dashboard */
-    --db-bg: #f5f7f4;
-    --db-surface: #fff;
-    --db-surface-soft: #f8faf7;
-    --db-text: #1c2922;
-    --db-text-soft: #526158;
-    --db-muted: #859087;
-    --db-border: #e5eae4;
-    --db-accent: #2d8a5b;
-    --db-accent-soft: #e8f5ec;
-    --db-shadow: 0 4px 20px rgb(23 49 33 / 3%);
-
-    /* Alias halaman — base + accent merah khusus hotspot */
-    --hm-bg: var(--db-bg);
-    --hm-surface: var(--db-surface);
-    --hm-soft: var(--db-surface-soft);
-    --hm-text: var(--db-text);
-    --hm-text-soft: var(--db-text-soft);
-    --hm-muted: var(--db-muted);
-    --hm-border: var(--db-border);
-    --hm-shadow: var(--db-shadow);
+    --hm-bg: #f5f7f4;
+    --hm-surface: #fff;
+    --hm-soft: #f8faf7;
+    --hm-text: #1c2922;
+    --hm-text-soft: #526158;
+    --hm-muted: #859087;
+    --hm-border: #e5eae4;
+    --hm-shadow: 0 4px 20px rgb(23 49 33 / 3%);
     --hm-accent: #d94b3d;
     --hm-accent-soft: #fff0ed;
 
@@ -729,19 +1072,14 @@ onBeforeUnmount(() => {
 }
 
 .nf-app.nf-hotspotmap.theme-dark {
-    /* Palet gelap — identik dengan Dashboard */
-    --db-bg: #111914;
-    --db-surface: #19231c;
-    --db-surface-soft: #1d2921;
-    --db-text: #edf4ed;
-    --db-text-soft: #b0bdb2;
-    --db-muted: #849489;
-    --db-border: #2b3a2e;
-    --db-accent: #70cf98;
-    --db-accent-soft: #213b2b;
-    --db-shadow: 0 4px 20px rgb(0 0 0 / 10%);
-
-    /* Accent merah hotspot, versi gelap */
+    --hm-bg: #111914;
+    --hm-surface: #19231c;
+    --hm-soft: #1d2921;
+    --hm-text: #edf4ed;
+    --hm-text-soft: #b0bdb2;
+    --hm-muted: #849489;
+    --hm-border: #2b3a2e;
+    --hm-shadow: 0 4px 20px rgb(0 0 0 / 10%);
     --hm-accent: #e06b61;
     --hm-accent-soft: #3b1e1c;
 }
@@ -762,11 +1100,16 @@ onBeforeUnmount(() => {
     cursor: pointer;
 }
 
+.nf-app.nf-hotspotmap button:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+}
+
 .nf-main {
     min-width: 0;
     min-height: 100vh;
     margin-left: 252px;
-    transition: margin-left .3s cubic-bezier(.4,0,.2,1);
+    transition: margin-left .3s ease;
 }
 
 .nf-main.nf-sidebar-collapsed {
@@ -775,7 +1118,7 @@ onBeforeUnmount(() => {
 
 .nf-topbar {
     position: sticky;
-    z-index: 300;
+    z-index: 500;
     top: 0;
     display: flex;
     min-height: 78px;
@@ -803,7 +1146,6 @@ onBeforeUnmount(() => {
     margin: 0;
     font-size: 21px;
     font-weight: 750;
-    letter-spacing: -.4px;
 }
 
 .nf-icon-button {
@@ -825,10 +1167,6 @@ onBeforeUnmount(() => {
 
 .nf-mobile-menu {
     display: none;
-}
-
-.nf-mobile-menu.nf-menu-visible {
-    display: grid;
 }
 
 .nf-page-content {
@@ -857,7 +1195,7 @@ onBeforeUnmount(() => {
     letter-spacing: 1.3px;
 }
 
-.nf-eyebrow span {
+.nf-eyebrow > span {
     width: 7px;
     height: 7px;
     border-radius: 50%;
@@ -868,7 +1206,6 @@ onBeforeUnmount(() => {
     margin: 0 0 8px;
     font-size: 26px;
     font-weight: 780;
-    letter-spacing: -.7px;
 }
 
 .nf-page-heading p,
@@ -890,12 +1227,12 @@ onBeforeUnmount(() => {
     border-radius: 9px;
     font-size: 12px;
     font-weight: 650;
-    transition: background .15s ease, border-color .15s ease;
 }
 
 .nf-button svg {
     width: 17px;
     height: 17px;
+    flex-shrink: 0;
 }
 
 .nf-button-primary {
@@ -916,6 +1253,35 @@ onBeforeUnmount(() => {
 
 .nf-button-outline:hover {
     background: var(--hm-soft);
+}
+
+.nf-alert {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    border: 1px solid #efc5c0;
+    border-radius: 10px;
+    color: var(--hm-text);
+    background: var(--hm-accent-soft);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.nf-alert strong {
+    color: var(--hm-accent);
+}
+
+.nf-retry-button {
+    margin-left: auto;
+    padding: 7px 10px;
+    border: 1px solid var(--hm-border);
+    border-radius: 7px;
+    color: var(--hm-text);
+    background: var(--hm-surface);
+    font-weight: 650;
 }
 
 .nf-stats-grid {
@@ -954,30 +1320,34 @@ onBeforeUnmount(() => {
     flex-shrink: 0;
     place-items: center;
     border-radius: 10px;
+    font-size: 19px;
 }
 
-.nf-stat-icon svg {
-    width: 19px;
-    height: 19px;
+.nf-stat-icon.red {
+    color: #d94b3d;
+    background: #fff0ed;
 }
 
-.nf-stat-icon.red { color: #d94b3d; background: #fff0ed; }
-.nf-stat-icon.orange { color: #d97706; background: #fff5e5; }
-.nf-stat-icon.blue { color: #3478d4; background: #eaf3ff; }
-.nf-stat-icon.green { color: #169b69; background: #e8f8f0; }
+.nf-stat-icon.orange {
+    color: #d97706;
+    background: #fff5e5;
+}
+
+.nf-stat-icon.blue {
+    color: #3478d4;
+    background: #eaf3ff;
+}
+
+.nf-stat-icon.green {
+    color: #169b69;
+    background: #e8f8f0;
+}
 
 .nf-stat-value {
     margin-bottom: 7px;
     font-size: 28px;
     font-weight: 780;
-    letter-spacing: -.8px;
     line-height: 1.2;
-}
-
-.nf-stat-value small {
-    color: var(--hm-text-soft);
-    font-size: 12px;
-    font-weight: 600;
 }
 
 .nf-stat-card > p {
@@ -987,6 +1357,116 @@ onBeforeUnmount(() => {
     line-height: 1.6;
 }
 
+/* FILTER PANEL */
+.nf-filter-panel {
+    margin-bottom: 20px;
+    scroll-margin-top: 90px;
+}
+
+.nf-filter-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.nf-filter-title h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 750;
+}
+
+.nf-filter-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 9px;
+    color: var(--hm-accent);
+    background: var(--hm-accent-soft);
+}
+
+.nf-filter-icon svg {
+    width: 19px;
+    height: 19px;
+}
+
+.nf-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 15px;
+}
+
+.nf-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.nf-field > span {
+    color: var(--hm-text-soft);
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.nf-field input,
+.nf-field select {
+    width: 100%;
+    min-width: 0;
+    height: 42px;
+    padding: 0 10px;
+    border: 1px solid var(--hm-border);
+    border-radius: 8px;
+    outline: none;
+    color: var(--hm-text);
+    background: var(--hm-surface);
+    font-size: 11px;
+}
+
+.nf-field input:focus,
+.nf-field select:focus {
+    border-color: var(--hm-accent);
+    box-shadow: 0 0 0 3px rgb(217 75 61 / 10%);
+}
+
+.nf-filter-actions {
+    display: flex;
+    grid-column: 1 / -1;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-top: 4px;
+}
+
+.nf-filter-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--hm-muted);
+    font-size: 10px;
+    line-height: 1.6;
+}
+
+.nf-filter-hint svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
+.nf-apply-button {
+    min-width: 145px;
+}
+
+.nf-date-error {
+    margin: 0 0 13px;
+    color: #dc3e3e;
+    font-size: 11px;
+}
+
+/* MAP AND DETAIL */
 .nf-main-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.8fr) minmax(270px, .9fr);
@@ -1011,7 +1491,6 @@ onBeforeUnmount(() => {
     margin: 0 0 6px;
     font-size: 15px;
     font-weight: 750;
-    letter-spacing: -.2px;
 }
 
 .nf-section-heading p {
@@ -1053,9 +1532,13 @@ onBeforeUnmount(() => {
     border-radius: 50%;
 }
 
-.nf-legend .high { background: #ef4444; }
-.nf-legend .nominal { background: #f59e0b; }
-.nf-legend .low { background: #3b82f6; }
+.nf-legend .high {
+    background: #ef4444;
+}
+
+.nf-legend .low {
+    background: #3b82f6;
+}
 
 .nf-map-wrap {
     position: relative;
@@ -1085,6 +1568,7 @@ onBeforeUnmount(() => {
     background: var(--hm-surface);
     box-shadow: var(--hm-shadow);
     font-size: 12px;
+    line-height: 1.6;
     text-align: center;
     pointer-events: none;
 }
@@ -1150,13 +1634,25 @@ onBeforeUnmount(() => {
     white-space: nowrap;
 }
 
-.confidence-high { color: #c93636; background: #ffeded; }
-.confidence-nominal { color: #a66b06; background: #fff4dc; }
-.confidence-low { color: #286fc1; background: #eaf3ff; }
+.confidence-high {
+    color: #c93636;
+    background: #ffeded;
+}
 
-.nf-app.nf-hotspotmap.theme-dark .confidence-high { color: #ffaaaa; background: #442629; }
-.nf-app.nf-hotspotmap.theme-dark .confidence-nominal { color: #ffd27b; background: #44351d; }
-.nf-app.nf-hotspotmap.theme-dark .confidence-low { color: #9bc9ff; background: #1e3550; }
+.confidence-low {
+    color: #286fc1;
+    background: #eaf3ff;
+}
+
+.nf-app.nf-hotspotmap.theme-dark .confidence-high {
+    color: #ffaaaa;
+    background: #442629;
+}
+
+.nf-app.nf-hotspotmap.theme-dark .confidence-low {
+    color: #9bc9ff;
+    background: #1e3550;
+}
 
 .nf-detail-list {
     padding: 8px 0;
@@ -1181,6 +1677,7 @@ onBeforeUnmount(() => {
 }
 
 .nf-detail-list strong {
+    max-width: 65%;
     overflow-wrap: anywhere;
     text-align: right;
     font-size: 11px;
@@ -1219,11 +1716,7 @@ onBeforeUnmount(() => {
     border-radius: 13px;
     color: var(--hm-muted);
     background: var(--hm-soft);
-}
-
-.nf-empty-icon svg {
-    width: 24px;
-    height: 24px;
+    font-size: 27px;
 }
 
 .nf-empty-state h4 {
@@ -1249,58 +1742,9 @@ onBeforeUnmount(() => {
     line-height: 1.7;
 }
 
-.nf-filter-panel,
+/* TABLE */
 .nf-table-panel {
     margin-bottom: 20px;
-}
-
-.nf-filter-grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 13px;
-}
-
-.nf-field {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.nf-field > span {
-    color: var(--hm-text-soft);
-    font-size: 11px;
-    font-weight: 650;
-}
-
-.nf-field input,
-.nf-field select {
-    width: 100%;
-    min-width: 0;
-    height: 41px;
-    padding: 0 10px;
-    border: 1px solid var(--hm-border);
-    border-radius: 8px;
-    outline: none;
-    color: var(--hm-text);
-    background: var(--hm-surface);
-    font-size: 11px;
-}
-
-.nf-field input::placeholder {
-    color: var(--hm-muted);
-}
-
-.nf-field input:focus,
-.nf-field select:focus {
-    border-color: var(--hm-accent);
-    box-shadow: 0 0 0 3px rgb(217 75 61 / 10%);
-}
-
-.nf-date-error {
-    margin: 0 0 13px;
-    color: #dc3e3e;
-    font-size: 11px;
 }
 
 .nf-table-scroll {
@@ -1330,10 +1774,6 @@ onBeforeUnmount(() => {
     border-bottom: 1px solid var(--hm-border);
     color: var(--hm-text-soft);
     font-size: 11px;
-}
-
-.nf-table-scroll tbody tr:last-child td {
-    border-bottom: 0;
 }
 
 .nf-table-scroll tbody tr:hover,
@@ -1366,12 +1806,31 @@ onBeforeUnmount(() => {
     text-align: center;
 }
 
-.nf-table-footer {
-    margin-top: 14px;
-    padding-top: 13px;
+.nf-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 15px;
+    padding-top: 14px;
     border-top: 1px solid var(--hm-border);
     color: var(--hm-muted);
     font-size: 10px;
+    line-height: 1.7;
+}
+
+.nf-pagination-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 9px;
+}
+
+.nf-pagination-controls > span {
+    color: var(--hm-text-soft);
+    white-space: nowrap;
 }
 
 .nf-page-footer {
@@ -1384,7 +1843,7 @@ onBeforeUnmount(() => {
     line-height: 1.6;
 }
 
-/* Marker Leaflet */
+/* LEAFLET */
 .nf-hotspot-marker-wrapper {
     border: 0;
     background: transparent;
@@ -1409,7 +1868,7 @@ onBeforeUnmount(() => {
 }
 
 .nf-hotspot-popup {
-    min-width: 150px;
+    min-width: 160px;
     color: #182230;
     font-family: inherit;
 }
@@ -1425,6 +1884,15 @@ onBeforeUnmount(() => {
     font-size: 11px;
 }
 
+.nf-app.nf-hotspotmap .nf-leaflet-map {
+    z-index: 1;
+}
+
+.nf-app.nf-hotspotmap .leaflet-control-attribution {
+    font-size: 9px;
+}
+
+/* RESPONSIVE */
 @media (max-width: 1200px) {
     .nf-page-content {
         padding-right: 22px;
@@ -1543,23 +2011,61 @@ onBeforeUnmount(() => {
         font-size: 10px;
     }
 
-    .nf-map-wrap {
-        height: 310px;
+    .nf-filter-panel > .nf-section-heading {
+        align-items: flex-start;
     }
 
-    .nf-map-footer {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 7px;
+    .nf-filter-panel > .nf-section-heading > .nf-button {
+        min-height: 34px;
+        padding: 0 9px;
+        font-size: 10px;
     }
 
     .nf-filter-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .nf-page-footer {
+    .nf-filter-actions {
+        align-items: stretch;
         flex-direction: column;
-        gap: 6px;
+    }
+
+    .nf-apply-button {
+        width: 100%;
+    }
+
+    .nf-map-wrap {
+        height: 310px;
+    }
+
+    .nf-map-footer,
+    .nf-page-footer {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 7px;
+    }
+
+    .nf-alert {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .nf-retry-button {
+        margin-left: 0;
+    }
+
+    .nf-pagination {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .nf-pagination-controls {
+        justify-content: space-between;
+    }
+
+    .nf-pagination-controls .nf-button {
+        padding: 0 9px;
+        font-size: 10px;
     }
 }
 </style>

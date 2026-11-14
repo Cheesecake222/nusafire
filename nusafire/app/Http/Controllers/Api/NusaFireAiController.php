@@ -11,6 +11,9 @@ use Throwable;
 
 class NusaFireAiController extends Controller
 {
+    /**
+     * URL dasar layanan Python AI.
+     */
     private function aiUrl(): string
     {
         return rtrim(
@@ -19,14 +22,26 @@ class NusaFireAiController extends Controller
         );
     }
 
-    private function requestAi(string $method, string $endpoint, array $data = []): JsonResponse
-    {
+    /**
+     * Mengirim permintaan dari Laravel ke FastAPI.
+     */
+    private function requestAi(
+        string $method,
+        string $endpoint,
+        array $data = []
+    ): JsonResponse {
         try {
             $request = Http::acceptJson()->timeout(30);
 
             $response = match (strtoupper($method)) {
-                'POST' => $request->post($this->aiUrl() . $endpoint, $data),
-                'GET' => $request->get($this->aiUrl() . $endpoint, $data),
+                'POST' => $request->post(
+                    $this->aiUrl() . $endpoint,
+                    $data
+                ),
+                'GET' => $request->get(
+                    $this->aiUrl() . $endpoint,
+                    $data
+                ),
                 default => throw new \InvalidArgumentException(
                     'Metode permintaan tidak didukung.'
                 ),
@@ -60,52 +75,134 @@ class NusaFireAiController extends Controller
         }
     }
 
+    /**
+     * Memeriksa status layanan AI.
+     */
     public function health(): JsonResponse
     {
         return $this->requestAi('GET', '/health');
     }
 
+    /**
+     * Mengambil statistik dataset dengan filter opsional.
+     */
     public function stats(Request $request): JsonResponse
     {
         $filters = $request->validate([
-            'start_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'end_date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
-            'region' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'start_date' => [
+                'sometimes',
+                'nullable',
+                'date_format:Y-m-d',
+            ],
+            'end_date' => [
+                'sometimes',
+                'nullable',
+                'date_format:Y-m-d',
+                'after_or_equal:start_date',
+            ],
+            'region' => [
+                'sometimes',
+                'nullable',
+                'string',
+                'max:100',
+            ],
         ]);
 
         return $this->requestAi('GET', '/stats', $filters);
     }
 
+    /**
+     * Mengambil data hotspot dengan filter status dan pagination.
+     *
+     * status:
+     * - all      : semua data
+     * - fire     : data kebakaran
+     * - non-fire : data non-kebakaran
+     */
     public function hotspots(Request $request): JsonResponse
     {
         $filters = $request->validate([
-            'start_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'end_date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
-            'region' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'limit' => ['sometimes', 'integer', 'min:1', 'max:1000'],
-            'offset' => ['sometimes', 'integer', 'min:0'],
+            'start_date' => [
+                'sometimes',
+                'nullable',
+                'date_format:Y-m-d',
+            ],
+            'end_date' => [
+                'sometimes',
+                'nullable',
+                'date_format:Y-m-d',
+                'after_or_equal:start_date',
+            ],
+            'region' => [
+                'sometimes',
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'status' => [
+                'sometimes',
+                'required',
+                'in:all,fire,non-fire',
+            ],
+            'limit' => [
+                'sometimes',
+                'integer',
+                'min:1',
+                'max:1000',
+            ],
+            'offset' => [
+                'sometimes',
+                'integer',
+                'min:0',
+            ],
         ]);
 
         return $this->requestAi('GET', '/hotspots', $filters);
     }
 
+    /**
+     * Mengambil data grafik.
+     */
     public function charts(Request $request): JsonResponse
     {
         $filters = $request->validate([
-            'period' => ['sometimes', 'in:daily,monthly'],
-            'start_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'end_date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
-            'region' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'period' => [
+                'sometimes',
+                'in:daily,monthly',
+            ],
+            'start_date' => [
+                'sometimes',
+                'nullable',
+                'date_format:Y-m-d',
+            ],
+            'end_date' => [
+                'sometimes',
+                'nullable',
+                'date_format:Y-m-d',
+                'after_or_equal:start_date',
+            ],
+            'region' => [
+                'sometimes',
+                'nullable',
+                'string',
+                'max:100',
+            ],
         ]);
 
         return $this->requestAi('GET', '/charts', $filters);
     }
 
+    /**
+     * Mengambil ringkasan statistik setiap wilayah.
+     */
     public function regions(): JsonResponse
     {
         return $this->requestAi('GET', '/regions');
     }
 
+    /**
+     * Melakukan prediksi melalui model AI.
+     */
     public function predict(Request $request): JsonResponse
     {
         $data = $request->validate([
