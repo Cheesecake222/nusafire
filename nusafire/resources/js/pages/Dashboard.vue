@@ -1,6 +1,6 @@
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AppSidebar from '@/components/AppSidebar.vue';
 import { useTheme } from '@/composables/useTheme';
@@ -9,73 +9,301 @@ const { theme, toggleTheme } = useTheme();
 
 const mobileMenuOpen = ref(false);
 const sidebarCollapsed = ref(false);
-const period = ref('7 Days');
+const loading = ref(true);
+const apiError = ref('');
 
-const periods = ['7 Days', '30 Days', '90 Days'];
+type Stats = {
+    total_records: number;
+    total_hotspot_count: number;
+    fire_records: number;
+    non_fire_records: number;
+    region_count: number;
+    start_date: string;
+    end_date: string;
+};
 
-const demoTrend = computed(() => {
-    const points: Record<string, number[]> = {
-        '7 Days': [22, 35, 28, 48, 39, 62, 54],
-        '30 Days': [20, 28, 24, 40, 35, 50, 46, 64, 48, 58],
-        '90 Days': [15, 25, 20, 35, 28, 42, 38, 55, 45, 62],
-    };
+type MonthlyRecord = {
+    period: string;
+    hotspot_count: number;
+    fire_records: number;
+    non_fire_records: number;
+};
 
-    return points[period.value] ?? points['7 Days'];
+type RegionRecord = {
+    REGION: string;
+    total_records: number;
+    total_hotspots: number;
+    fire_records: number;
+};
+
+const stats = ref<Stats | null>(null);
+const monthlyData = ref<MonthlyRecord[]>([]);
+const regionData = ref<RegionRecord[]>([]);
+
+const period = ref('12 Months');
+const periods = ['12 Months', '24 Months', 'All Period'];
+
+const numberFormatter = new Intl.NumberFormat('id-ID');
+
+function formatNumber(value: number | undefined): string {
+    if (value === undefined || !Number.isFinite(value)) {
+        return '—';
+    }
+
+    return numberFormatter.format(value);
+}
+
+function formatDate(value: string | undefined): string {
+    if (!value) return '—';
+
+    const date = new Date(`${value}T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) return value;
+
+    return new Intl.DateTimeFormat('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    }).format(date);
+}
+
+async function fetchApi<T>(url: string): Promise<T> {
+    const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+    });
+
+    if (response.redirected) {
+        throw new Error(
+            'Sesi login tidak tersedia. Silakan login kembali.',
+        );
+    }
+
+    if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+            throw new Error(
+                'Akses API ditolak. Pastikan akun sudah login dan terverifikasi.',
+            );
+        }
+
+        throw new Error(
+            `Permintaan API gagal dengan status HTTP ${response.status}.`,
+        );
+    }
+
+    return response.json() as Promise<T>;
+}
+
+async function loadDashboard(): Promise<void> {
+    loading.value = true;
+    apiError.value = '';
+
+    try {
+        const [statsResponse, chartsResponse, regionsResponse] =
+            await Promise.all([
+                fetchApi<{
+                    status: string;
+                    total_records: number;
+                    total_hotspot_count: number;
+                    fire_records: number;
+                    non_fire_records: number;
+                    region_count: number;
+                    start_date: string;
+                    end_date: string;
+                }>('/internal/ai/stats'),
+
+                fetchApi<{
+                    status: string;
+                    period: string;
+                    data: MonthlyRecord[];
+                }>('/internal/ai/charts?period=monthly'),
+
+                fetchApi<{
+                    status: string;
+                    total_regions: number;
+                    data: RegionRecord[];
+                }>('/internal/ai/regions'),
+            ]);
+
+        if (
+            statsResponse.status !== 'success' ||
+            chartsResponse.status !== 'success' ||
+            regionsResponse.status !== 'success'
+        ) {
+            throw new Error(
+                'Salah satu endpoint API tidak mengembalikan status sukses.',
+            );
+        }
+
+        stats.value = {
+            total_records: statsResponse.total_records,
+            total_hotspot_count: statsResponse.total_hotspot_count,
+            fire_records: statsResponse.fire_records,
+            non_fire_records: statsResponse.non_fire_records,
+            region_count: statsResponse.region_count,
+            start_date: statsResponse.start_date,
+            end_date: statsResponse.end_date,
+        };
+
+        monthlyData.value = [...chartsResponse.data].sort((a, b) =>
+            a.period.localeCompare(b.period),
+        );
+
+        regionData.value = [...regionsResponse.data].sort(
+            (a, b) => b.total_hotspots - a.total_hotspots,
+        );
+    } catch (error) {
+        apiError.value =
+            error instanceof Error
+                ? error.message
+                : 'Terjadi kesalahan saat mengambil data dashboard.';
+    } finally {
+        loading.value = false;
+    }
+}
+
+const visibleMonthlyData = computed(() => {
+    if (period.value === '12 Months') {
+        return monthlyData.value.slice(-12);
+    }
+
+    if (period.value === '24 Months') {
+        return monthlyData.value.slice(-24);
+    }
+
+    return monthlyData.value;
 });
 
+const chartValues = computed(() =>
+    visibleMonthlyData.value.map((item) => item.hotspot_count),
+);
+
+const chartMax = computed(() =>
+    Math.max(...chartValues.value, 1),
+);
+
 const chartPoints = computed(() => {
-    const values = demoTrend.value;
+    const values = chartValues.value;
     const width = 580;
     const height = 155;
-    const max = Math.max(...values) + 10;
 
     return values.map((value, index) => ({
-        x: 10 + (index * (width - 20)) / Math.max(values.length - 1, 1),
-        y: height - (value / max) * (height - 20),
+        x:
+            values.length <= 1
+                ? width / 2
+                : 10 + (index * (width - 20)) / (values.length - 1),
+        y: height - (value / chartMax.value) * (height - 20),
+        value,
+        label: visibleMonthlyData.value[index]?.period ?? '',
     }));
 });
 
 const chartLine = computed(() =>
     chartPoints.value
-        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+        .map(
+            (point, index) =>
+                `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`,
+        )
         .join(' '),
 );
 
 const chartArea = computed(() => {
+    if (chartPoints.value.length === 0) return '';
+
     const lastX = chartPoints.value.at(-1)?.x ?? 590;
     const firstX = chartPoints.value[0]?.x ?? 10;
 
     return `${chartLine.value} L ${lastX} 155 L ${firstX} 155 Z`;
 });
 
-const regions = [
-    { name: 'Sumatra', width: 78 },
-    { name: 'Kalimantan', width: 62 },
-    { name: 'Sulawesi', width: 38 },
-    { name: 'Papua', width: 24 },
-];
+const chartAxisLabels = computed(() => {
+    const max = chartMax.value;
+
+    return [
+        formatNumber(max),
+        formatNumber(Math.round(max * 0.67)),
+        formatNumber(Math.round(max * 0.33)),
+        '0',
+    ];
+});
+
+const chartPeriodLabels = computed(() => {
+    const data = visibleMonthlyData.value;
+
+    if (data.length === 0) {
+        return {
+            start: '—',
+            middle: '—',
+            end: '—',
+        };
+    }
+
+    return {
+        start: data[0].period,
+        middle: data[Math.floor((data.length - 1) / 2)].period,
+        end: data[data.length - 1].period,
+    };
+});
+
+const regions = computed(() => {
+    const max = Math.max(
+        ...regionData.value.map((region) => region.total_hotspots),
+        1,
+    );
+
+    return regionData.value.map((region) => ({
+        name: region.REGION,
+        hotspots: region.total_hotspots,
+        fireRecords: region.fire_records,
+        width: Math.max(
+            2,
+            (region.total_hotspots / max) * 100,
+        ),
+    }));
+});
 
 const weatherItems = [
-    { label: 'Temperature', value: '—', unit: '°C', icon: '☀' },
-    { label: 'Humidity', value: '—', unit: '%', icon: '◌' },
-    { label: 'Precipitation', value: '—', unit: 'mm', icon: '☂' },
+    {
+        label: 'Temperature',
+        value: '—',
+        unit: '°C',
+        icon: '☀',
+    },
+    {
+        label: 'Humidity',
+        value: '—',
+        unit: '%',
+        icon: '◌',
+    },
+    {
+        label: 'Precipitation',
+        value: '—',
+        unit: 'mm',
+        icon: '☂',
+    },
 ];
 
-
+onMounted(loadDashboard);
 </script>
 
 <template>
     <Head title="NusaFire Dashboard" />
 
     <div class="nf-app" :class="`theme-${theme}`">
-        <!-- Shared sidebar: used by other pages too -->
         <AppSidebar
             :mobile-open="mobileMenuOpen"
             v-model:collapsed="sidebarCollapsed"
             @close="mobileMenuOpen = false"
         />
 
-        <main class="nf-main" :class="{ 'nf-sidebar-collapsed': sidebarCollapsed }">
+        <main
+            class="nf-main"
+            :class="{ 'nf-sidebar-collapsed': sidebarCollapsed }"
+        >
             <header class="nf-topbar">
                 <div class="nf-topbar-left">
                     <button
@@ -141,66 +369,150 @@ const weatherItems = [
                         <span class="nf-date-icon">◷</span>
                         <div>
                             <strong>Data overview</strong>
-                            <span>Live data integration pending</span>
+
+                            <span v-if="loading">
+                                Loading dataset...
+                            </span>
+
+                            <span v-else-if="apiError">
+                                Data unavailable
+                            </span>
+
+                            <span v-else-if="stats">
+                                {{ formatDate(stats.start_date) }} –
+                                {{ formatDate(stats.end_date) }}
+                            </span>
                         </div>
                     </div>
                 </section>
+
+                <div
+                    v-if="apiError"
+                    class="nf-api-message"
+                    role="alert"
+                >
+                    <strong>Data belum dapat dimuat.</strong>
+                    <span>{{ apiError }}</span>
+
+                    <button
+                        type="button"
+                        @click="loadDashboard"
+                    >
+                        Coba lagi
+                    </button>
+                </div>
 
                 <!-- Summary statistics -->
                 <section class="nf-stats-grid">
                     <article class="nf-stat-card">
                         <div class="nf-stat-top">
-                            <span class="nf-stat-label">Detected Hotspots</span>
-                            <span class="nf-stat-icon nf-icon-green">◎</span>
+                            <span class="nf-stat-label">
+                                Total Hotspots
+                            </span>
+                            <span class="nf-stat-icon nf-icon-green">
+                                ◎
+                            </span>
                         </div>
 
-                        <div class="nf-stat-value">—</div>
+                        <div class="nf-stat-value">
+                            {{
+                                loading
+                                    ? '—'
+                                    : formatNumber(stats?.total_hotspot_count)
+                            }}
+                        </div>
 
                         <div class="nf-stat-bottom">
-                            <span class="nf-stat-caption">NASA FIRMS</span>
-                            <span class="nf-stat-tag">Awaiting data</span>
+                            <span class="nf-stat-caption">
+                                Dataset AI
+                            </span>
+                            <span class="nf-stat-tag">
+                                Hotspot count
+                            </span>
                         </div>
                     </article>
 
                     <article class="nf-stat-card">
                         <div class="nf-stat-top">
-                            <span class="nf-stat-label">Burned Area</span>
-                            <span class="nf-stat-icon nf-icon-orange">▧</span>
+                            <span class="nf-stat-label">
+                                Fire Records
+                            </span>
+                            <span class="nf-stat-icon nf-icon-orange">
+                                ♨
+                            </span>
                         </div>
 
-                        <div class="nf-stat-value">— <small>ha</small></div>
+                        <div class="nf-stat-value">
+                            {{
+                                loading
+                                    ? '—'
+                                    : formatNumber(stats?.fire_records)
+                            }}
+                        </div>
 
                         <div class="nf-stat-bottom">
-                            <span class="nf-stat-caption">Burned-area data</span>
-                            <span class="nf-stat-tag">Awaiting data</span>
+                            <span class="nf-stat-caption">
+                                Record kebakaran
+                            </span>
+                            <span class="nf-stat-tag">
+                                Dataset AI
+                            </span>
                         </div>
                     </article>
 
                     <article class="nf-stat-card">
                         <div class="nf-stat-top">
-                            <span class="nf-stat-label">Average Temperature</span>
-                            <span class="nf-stat-icon nf-icon-yellow">☀</span>
+                            <span class="nf-stat-label">
+                                Non-Fire Records
+                            </span>
+                            <span class="nf-stat-icon nf-icon-yellow">
+                                ◉
+                            </span>
                         </div>
 
-                        <div class="nf-stat-value">— <small>°C</small></div>
+                        <div class="nf-stat-value">
+                            {{
+                                loading
+                                    ? '—'
+                                    : formatNumber(stats?.non_fire_records)
+                            }}
+                        </div>
 
                         <div class="nf-stat-bottom">
-                            <span class="nf-stat-caption">NASA POWER</span>
-                            <span class="nf-stat-tag">Awaiting data</span>
+                            <span class="nf-stat-caption">
+                                Record non-kebakaran
+                            </span>
+                            <span class="nf-stat-tag">
+                                Dataset AI
+                            </span>
                         </div>
                     </article>
 
                     <article class="nf-stat-card">
                         <div class="nf-stat-top">
-                            <span class="nf-stat-label">Relative Humidity</span>
-                            <span class="nf-stat-icon nf-icon-blue">◌</span>
+                            <span class="nf-stat-label">
+                                Monitored Regions
+                            </span>
+                            <span class="nf-stat-icon nf-icon-blue">
+                                ⌖
+                            </span>
                         </div>
 
-                        <div class="nf-stat-value">— <small>%</small></div>
+                        <div class="nf-stat-value">
+                            {{
+                                loading
+                                    ? '—'
+                                    : formatNumber(stats?.region_count)
+                            }}
+                        </div>
 
                         <div class="nf-stat-bottom">
-                            <span class="nf-stat-caption">Weather indicators</span>
-                            <span class="nf-stat-tag">Awaiting data</span>
+                            <span class="nf-stat-caption">
+                                Kelompok wilayah dataset
+                            </span>
+                            <span class="nf-stat-tag">
+                                Regional data
+                            </span>
                         </div>
                     </article>
                 </section>
@@ -210,9 +522,13 @@ const weatherItems = [
                     <article class="nf-panel nf-trend-panel">
                         <div class="nf-panel-heading">
                             <div>
-                                <div class="nf-panel-kicker">FIRE ACTIVITY</div>
+                                <div class="nf-panel-kicker">
+                                    FIRE ACTIVITY
+                                </div>
                                 <h2>Hotspot activity</h2>
-                                <p>Illustrative historical trend preview</p>
+                                <p>
+                                    Monthly hotspot records from the AI dataset
+                                </p>
                             </div>
 
                             <select
@@ -232,16 +548,24 @@ const weatherItems = [
 
                         <div class="nf-chart-legend">
                             <span class="nf-legend-dot" />
-                            Hotspot detections
-                            <span class="nf-demo-label">Demo visualization</span>
+                            Hotspot count
+                            <span class="nf-demo-label">
+                                {{
+                                    loading
+                                        ? 'Loading...'
+                                        : 'Actual dataset'
+                                }}
+                            </span>
                         </div>
 
                         <div class="nf-chart-wrap">
                             <div class="nf-chart-y-labels">
-                                <span>High</span>
-                                <span>Medium</span>
-                                <span>Low</span>
-                                <span>0</span>
+                                <span
+                                    v-for="(label, index) in chartAxisLabels"
+                                    :key="index"
+                                >
+                                    {{ label }}
+                                </span>
                             </div>
 
                             <svg
@@ -249,7 +573,7 @@ const weatherItems = [
                                 viewBox="0 0 600 165"
                                 preserveAspectRatio="none"
                                 role="img"
-                                aria-label="Illustrative hotspot trend, not real data"
+                                aria-label="Grafik jumlah hotspot bulanan dari dataset"
                             >
                                 <defs>
                                     <linearGradient
@@ -272,49 +596,110 @@ const weatherItems = [
                                     </linearGradient>
                                 </defs>
 
-                                <line x1="10" y1="20" x2="590" y2="20" class="nf-chart-grid" />
-                                <line x1="10" y1="60" x2="590" y2="60" class="nf-chart-grid" />
-                                <line x1="10" y1="100" x2="590" y2="100" class="nf-chart-grid" />
-                                <line x1="10" y1="155" x2="590" y2="155" class="nf-chart-grid" />
+                                <line
+                                    x1="10"
+                                    y1="20"
+                                    x2="590"
+                                    y2="20"
+                                    class="nf-chart-grid"
+                                />
+                                <line
+                                    x1="10"
+                                    y1="60"
+                                    x2="590"
+                                    y2="60"
+                                    class="nf-chart-grid"
+                                />
+                                <line
+                                    x1="10"
+                                    y1="100"
+                                    x2="590"
+                                    y2="100"
+                                    class="nf-chart-grid"
+                                />
+                                <line
+                                    x1="10"
+                                    y1="155"
+                                    x2="590"
+                                    y2="155"
+                                    class="nf-chart-grid"
+                                />
 
-                                <path :d="chartArea" fill="url(#nf-chart-fill)" />
-                                <path :d="chartLine" class="nf-chart-line" />
+                                <path
+                                    :d="chartArea"
+                                    fill="url(#nf-chart-fill)"
+                                />
+                                <path
+                                    :d="chartLine"
+                                    class="nf-chart-line"
+                                />
 
                                 <circle
-                                    v-for="(point, index) in chartPoints"
-                                    :key="index"
+                                    v-for="point in chartPoints"
+                                    :key="point.label"
                                     :cx="point.x"
                                     :cy="point.y"
-                                    r="4"
+                                    r="3"
                                     class="nf-chart-point"
-                                />
+                                >
+                                    <title>
+                                        {{ point.label }}:
+                                        {{ formatNumber(point.value) }}
+                                        hotspot
+                                    </title>
+                                </circle>
                             </svg>
                         </div>
 
                         <div class="nf-chart-x-labels">
-                            <span>Period start</span>
-                            <span>Mid-period</span>
-                            <span>Period end</span>
+                            <span>{{ chartPeriodLabels.start }}</span>
+                            <span>{{ chartPeriodLabels.middle }}</span>
+                            <span>{{ chartPeriodLabels.end }}</span>
                         </div>
 
                         <div class="nf-panel-footnote">
                             <span>ⓘ</span>
-                            Example visualization only. Real hotspot records are not plotted.
+                            Jumlah hotspot bulanan berdasarkan dataset
+                            periode
+                            {{ stats?.start_date ?? '—' }}
+                            sampai
+                            {{ stats?.end_date ?? '—' }}.
                         </div>
                     </article>
 
                     <article class="nf-panel nf-region-panel">
                         <div class="nf-panel-heading">
                             <div>
-                                <div class="nf-panel-kicker">REGIONAL OVERVIEW</div>
+                                <div class="nf-panel-kicker">
+                                    REGIONAL OVERVIEW
+                                </div>
                                 <h2>Regional distribution</h2>
-                                <p>Regions to monitor</p>
+                                <p>
+                                    Distribution by dataset region
+                                </p>
                             </div>
 
                             <span class="nf-mini-icon">⌖</span>
                         </div>
 
-                        <div class="nf-region-list">
+                        <div
+                            v-if="loading"
+                            class="nf-empty-state"
+                        >
+                            Memuat data wilayah...
+                        </div>
+
+                        <div
+                            v-else-if="regions.length === 0"
+                            class="nf-empty-state"
+                        >
+                            Data wilayah belum tersedia.
+                        </div>
+
+                        <div
+                            v-else
+                            class="nf-region-list"
+                        >
                             <div
                                 v-for="(region, index) in regions"
                                 :key="region.name"
@@ -322,16 +707,26 @@ const weatherItems = [
                             >
                                 <div class="nf-region-top">
                                     <span class="nf-region-number">
-                                        0{{ index + 1 }}
+                                        {{
+                                            String(index + 1).padStart(2, '0')
+                                        }}
                                     </span>
-                                    <span class="nf-region-name">{{ region.name }}</span>
-                                    <span class="nf-region-value">—</span>
+
+                                    <span class="nf-region-name">
+                                        {{ region.name }}
+                                    </span>
+
+                                    <span class="nf-region-value">
+                                        {{ formatNumber(region.hotspots) }}
+                                    </span>
                                 </div>
 
                                 <div class="nf-progress-track">
                                     <div
                                         class="nf-progress-fill"
-                                        :style="{ width: `${region.width}%` }"
+                                        :style="{
+                                            width: `${region.width}%`,
+                                        }"
                                     />
                                 </div>
                             </div>
@@ -339,7 +734,8 @@ const weatherItems = [
 
                         <div class="nf-panel-footnote">
                             <span>ⓘ</span>
-                            Decorative bars only; regional totals are not yet available.
+                            Nilai menunjukkan total hotspot setiap kelompok
+                            wilayah berdasarkan data API.
                         </div>
                     </article>
                 </section>
@@ -349,12 +745,19 @@ const weatherItems = [
                     <article class="nf-panel nf-map-panel">
                         <div class="nf-panel-heading">
                             <div>
-                                <div class="nf-panel-kicker">GEOSPATIAL MONITORING</div>
+                                <div class="nf-panel-kicker">
+                                    GEOSPATIAL MONITORING
+                                </div>
                                 <h2>Indonesia overview</h2>
-                                <p>Hotspot geographic visualization</p>
+                                <p>
+                                    Hotspot geographic visualization
+                                </p>
                             </div>
 
-                            <Link href="/hotspot-map" class="nf-outline-button">
+                            <Link
+                                href="/hotspot-map"
+                                class="nf-outline-button"
+                            >
                                 Explore map ↗
                             </Link>
                         </div>
@@ -366,31 +769,81 @@ const weatherItems = [
                                 viewBox="0 0 650 250"
                                 class="nf-island-art"
                                 role="img"
-                                aria-label="Decorative island illustration, not a geographic map"
+                                aria-label="Ilustrasi dekoratif pulau, bukan peta geografis"
                             >
-                                <path d="M65 82l35-20 35 8 18 20-14 17-28 4-12 18-23-4-18-17z" class="nf-island" />
-                                <path d="M155 148l22-9 21 9 18 28-9 35-16 12-12-20-17-18z" class="nf-island" />
-                                <path d="M238 63l20-10 17 13-6 17-20 5-14-10z" class="nf-island" />
-                                <path d="M270 102l18-9 14 12-6 18-20 5-13-12z" class="nf-island" />
-                                <path d="M335 112l24-17 25 5 17 19-11 17-24-3-17 12-18-12z" class="nf-island" />
-                                <path d="M420 73l35-16 38 11 18 20-13 19-32 6-19 20-25-10-15-22z" class="nf-island" />
-                                <path d="M505 155l21-9 19 12-5 17-25 5-14-11z" class="nf-island" />
+                                <path
+                                    d="M65 82l35-20 35 8 18 20-14 17-28 4-12 18-23-4-18-17z"
+                                    class="nf-island"
+                                />
+                                <path
+                                    d="M155 148l22-9 21 9 18 28-9 35-16 12-12-20-17-18z"
+                                    class="nf-island"
+                                />
+                                <path
+                                    d="M238 63l20-10 17 13-6 17-20 5-14-10z"
+                                    class="nf-island"
+                                />
+                                <path
+                                    d="M270 102l18-9 14 12-6 18-20 5-13-12z"
+                                    class="nf-island"
+                                />
+                                <path
+                                    d="M335 112l24-17 25 5 17 19-11 17-24-3-17 12-18-12z"
+                                    class="nf-island"
+                                />
+                                <path
+                                    d="M420 73l35-16 38 11 18 20-13 19-32 6-19 20-25-10-15-22z"
+                                    class="nf-island"
+                                />
+                                <path
+                                    d="M505 155l21-9 19 12-5 17-25 5-14-11z"
+                                    class="nf-island"
+                                />
 
-                                <circle cx="130" cy="92" r="4" class="nf-map-dot" />
-                                <circle cx="183" cy="174" r="4" class="nf-map-dot" />
-                                <circle cx="355" cy="119" r="4" class="nf-map-dot" />
-                                <circle cx="456" cy="88" r="4" class="nf-map-dot" />
+                                <circle
+                                    cx="130"
+                                    cy="92"
+                                    r="4"
+                                    class="nf-map-dot"
+                                />
+                                <circle
+                                    cx="183"
+                                    cy="174"
+                                    r="4"
+                                    class="nf-map-dot"
+                                />
+                                <circle
+                                    cx="355"
+                                    cy="119"
+                                    r="4"
+                                    class="nf-map-dot"
+                                />
+                                <circle
+                                    cx="456"
+                                    cy="88"
+                                    r="4"
+                                    class="nf-map-dot"
+                                />
                             </svg>
 
                             <div class="nf-map-placeholder">
-                                <span class="nf-map-placeholder-icon">⌖</span>
-                                <strong>Geospatial layer not connected</strong>
-                                <span>
-                                    Connect geographic boundaries and hotspot coordinates
-                                    to display a real map.
+                                <span class="nf-map-placeholder-icon">
+                                    ⌖
                                 </span>
 
-                                <Link href="/hotspot-map" class="nf-map-link">
+                                <strong>
+                                    Geospatial layer not connected
+                                </strong>
+
+                                <span>
+                                    Connect geographic boundaries and hotspot
+                                    coordinates to display a real map.
+                                </span>
+
+                                <Link
+                                    href="/hotspot-map"
+                                    class="nf-map-link"
+                                >
                                     Open Hotspot Map
                                 </Link>
                             </div>
@@ -404,7 +857,9 @@ const weatherItems = [
                     <article class="nf-panel nf-weather-panel">
                         <div class="nf-panel-heading">
                             <div>
-                                <div class="nf-panel-kicker">ENVIRONMENTAL CONDITIONS</div>
+                                <div class="nf-panel-kicker">
+                                    ENVIRONMENTAL CONDITIONS
+                                </div>
                                 <h2>Weather snapshot</h2>
                                 <p>Weather indicators</p>
                             </div>
@@ -418,10 +873,13 @@ const weatherItems = [
                                 :key="item.label"
                                 class="nf-weather-item"
                             >
-                                <span class="nf-weather-icon">{{ item.icon }}</span>
+                                <span class="nf-weather-icon">
+                                    {{ item.icon }}
+                                </span>
 
                                 <div class="nf-weather-copy">
                                     <span>{{ item.label }}</span>
+
                                     <strong>
                                         {{ item.value }}
                                         <small>{{ item.unit }}</small>
@@ -432,10 +890,13 @@ const weatherItems = [
 
                         <div class="nf-weather-source">
                             <span class="nf-status-dot" />
-                            NASA POWER · Pending integration
+                            Weather API · Not connected
                         </div>
 
-                        <Link href="/weather-analysis" class="nf-weather-link">
+                        <Link
+                            href="/weather-analysis"
+                            class="nf-weather-link"
+                        >
                             View weather analysis →
                         </Link>
                     </article>
@@ -446,11 +907,15 @@ const weatherItems = [
                         <span class="nf-footer-mark">N</span>
                         <span>
                             NusaFire
-                            <span class="nf-footer-muted">· Environmental Intelligence</span>
+                            <span class="nf-footer-muted">
+                                · Environmental Intelligence
+                            </span>
                         </span>
                     </div>
 
-                    <span>BUILT FOR A SAFER, GREENER FUTURE</span>
+                    <span>
+                        BUILT FOR A SAFER, GREENER FUTURE
+                    </span>
                 </footer>
             </div>
         </main>
@@ -474,7 +939,8 @@ const weatherItems = [
     min-height: 100vh;
     color: var(--db-text);
     background: var(--db-bg);
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 13px;
     transition: background .2s ease, color .2s ease;
 }
@@ -511,7 +977,7 @@ const weatherItems = [
 .nf-main {
     min-height: 100vh;
     margin-left: 252px;
-    transition: margin-left .3s cubic-bezier(.4,0,.2,1);
+    transition: margin-left .3s cubic-bezier(.4, 0, .2, 1);
 }
 
 .nf-main.nf-sidebar-collapsed {
@@ -684,6 +1150,36 @@ const weatherItems = [
     font-size: 9px;
 }
 
+.nf-api-message {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 14px 16px;
+    color: var(--db-text);
+    background: var(--db-surface);
+    border: 1px solid var(--db-border);
+    border-left: 3px solid #d27d42;
+    border-radius: 10px;
+    font-size: 11px;
+}
+
+.nf-api-message span {
+    flex: 1;
+    color: var(--db-text-soft);
+}
+
+.nf-api-message button {
+    padding: 8px 12px;
+    color: var(--db-accent);
+    background: var(--db-accent-soft);
+    border: 1px solid var(--db-border);
+    border-radius: 7px;
+    font-size: 10px;
+    font-weight: 650;
+}
+
 .nf-stats-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -752,13 +1248,6 @@ const weatherItems = [
     font-size: 31px;
     font-weight: 750;
     letter-spacing: -1px;
-}
-
-.nf-stat-value small {
-    color: var(--db-text-soft);
-    font-size: 13px;
-    font-weight: 550;
-    letter-spacing: 0;
 }
 
 .nf-stat-bottom {
@@ -899,9 +1388,16 @@ const weatherItems = [
 .nf-chart-x-labels {
     display: flex;
     justify-content: space-between;
+    gap: 8px;
     margin: 12px 0 0 54px;
     color: var(--db-muted);
     font-size: 9px;
+}
+
+.nf-chart-x-labels span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .nf-panel-footnote {
@@ -958,6 +1454,7 @@ const weatherItems = [
 .nf-region-value {
     color: var(--db-text-soft);
     font-size: 10px;
+    font-variant-numeric: tabular-nums;
 }
 
 .nf-progress-track {
@@ -972,6 +1469,15 @@ const weatherItems = [
     background: #43a978;
     border-radius: inherit;
     opacity: .85;
+    transition: width .3s ease;
+}
+
+.nf-empty-state {
+    margin-top: 25px;
+    padding: 20px 0;
+    color: var(--db-muted);
+    font-size: 11px;
+    text-align: center;
 }
 
 .nf-secondary-grid {
@@ -1334,7 +1840,7 @@ const weatherItems = [
     }
 
     .nf-select {
-        max-width: 94px;
+        max-width: 105px;
         padding: 7px 5px;
     }
 
