@@ -871,10 +871,10 @@ onBeforeUnmount(() => {
     --nf-green: #218653;
     --nf-green-dark: #176b43;
     --nf-green-light: #eaf5ed;
-    --nf-sidebar-text: var(--db-text, #25372c);
-    --nf-sidebar-muted: var(--db-muted, #829087);
-    --nf-sidebar-border: var(--db-border, #e6ece7);
-    --nf-sidebar-surface: var(--db-surface, #ffffff);
+    --nf-sidebar-text: var(--db-text, var(--hm-text, #25372c));
+    --nf-sidebar-muted: var(--db-muted, var(--hm-muted, #829087));
+    --nf-sidebar-border: var(--db-border, var(--hm-border, #e6ece7));
+    --nf-sidebar-surface: var(--db-surface, var(--hm-surface, #ffffff));
 
     position: fixed;
     inset: 0 auto 0 0;
@@ -1104,6 +1104,12 @@ html.dark .nf-brand-mark {
     box-shadow: 0 4px 12px rgba(33, 134, 83, 0.08);
 }
 
+.theme-dark .nf-sidebar-note:hover,
+html.dark .nf-sidebar-note:hover {
+    border-color: #3a5a44;
+    box-shadow: 0 4px 12px rgba(33, 134, 83, 0.15);
+}
+
 .nf-sidebar-note.is-active {
     background: #eaf5ed;
     border-color: #218653;
@@ -1126,6 +1132,12 @@ html.dark .nf-sidebar-note.is-active {
     border-radius: 13px;
 }
 
+.theme-dark .nf-sidebar-note,
+html.dark .nf-sidebar-note {
+    background: var(--db-surface-soft, #1d2921);
+    border-color: var(--db-border, #2b3a2e);
+}
+
 .nf-note-icon {
     display: grid;
     width: 34px;
@@ -1135,6 +1147,11 @@ html.dark .nf-sidebar-note.is-active {
     color: #ffffff;
     background: #34865a;
     border-radius: 10px;
+}
+
+.theme-dark .nf-note-icon,
+html.dark .nf-note-icon {
+    background: #25573b;
 }
 
 .nf-note-icon svg {
@@ -1154,10 +1171,20 @@ html.dark .nf-sidebar-note.is-active {
     font-weight: 800;
 }
 
+.theme-dark .nf-note-copy strong,
+html.dark .nf-note-copy strong {
+    color: var(--db-text, #edf4ed);
+}
+
 .nf-note-copy > span {
     color: #7a8b7f;
     font-size: 9px;
     line-height: 1.5;
+}
+
+.theme-dark .nf-note-copy > span,
+html.dark .nf-note-copy > span {
+    color: var(--db-muted, #849489);
 }
 
 .nf-note-copy .nf-system-status {
@@ -1167,6 +1194,11 @@ html.dark .nf-sidebar-note.is-active {
     color: #378452;
     font-size: 9px;
     font-weight: 700;
+}
+
+.theme-dark .nf-note-copy .nf-system-status,
+html.dark .nf-note-copy .nf-system-status {
+    color: #5cb77e;
 }
 
 .nf-system-status i {
@@ -1370,6 +1402,12 @@ html.dark .nf-sidebar-note.is-active {
 .nf-sidebar-note:hover {
     border-color: #bad3c0;
     box-shadow: 0 4px 12px rgba(33, 134, 83, 0.08);
+}
+
+.theme-dark .nf-sidebar-note:hover,
+html.dark .nf-sidebar-note:hover {
+    border-color: #3a5a44;
+    box-shadow: 0 4px 12px rgba(33, 134, 83, 0.15);
 }
 
 .nf-sidebar-note.is-active {
@@ -1956,6 +1994,12 @@ html.dark .nf-sidebar-note.is-active {
     box-shadow: 0 4px 12px rgba(33, 134, 83, 0.08);
 }
 
+.theme-dark .nf-sidebar-note:hover,
+html.dark .nf-sidebar-note:hover {
+    border-color: #3a5a44;
+    box-shadow: 0 4px 12px rgba(33, 134, 83, 0.15);
+}
+
 .nf-sidebar-note.is-active {
     background: #eaf5ed;
     border-color: #218653;
@@ -2035,4 +2079,306 @@ html.dark .nf-sidebar-note.is-active {
         max-width: none;
     }
 }
+
+
+/* ========================================
+   NUSAFIRE LIVING SIDEBAR — VISUAL ONLY
+   Keeps existing Vue, navigation, auth and events unchanged.
+======================================== */
+
+.nf-sidebar {
+    --nf-gold: #f3c969;
+    --nf-gold-bright: #ffe6a0;
+    isolation: isolate;
+    background:
+        radial-gradient(ellipse at 0% 0%, rgb(243 201 105 / 14%), transparent 38%),
+        radial-gradient(ellipse at 100% 70%, rgb(33 134 83 / 8%), transparent 42%),
+        var(--nf-sidebar-surface);
+    box-shadow: 8px 0 34px rgb(18 45 27 / 7%);
+    transition:
+        width .25s ease,
+        transform .25s ease,
+        box-shadow .3s ease,
+        background-color .3s ease;
+}
+
+.nf-sidebar::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: -110px;
+    left: -110px;
+    width: 270px;
+    height: 270px;
+    pointer-events: none;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgb(255 208 105 / 18%), rgb(255 208 105 / 0%) 70%);
+    filter: blur(8px);
+    animation: nf-sidebar-aura 8s ease-in-out infinite alternate;
+}
+
+.nf-sidebar::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 2px;
+    pointer-events: none;
+    background: linear-gradient(180deg,
+        rgb(255 220 139 / 0%),
+        rgb(243 201 105 / 78%) 18%,
+        rgb(52 211 153 / 48%) 58%,
+        rgb(255 220 139 / 0%));
+    opacity: .7;
+}
+
+.theme-dark .nf-sidebar,
+html.dark .nf-sidebar {
+    background:
+        radial-gradient(ellipse at 0% 0%, rgb(243 201 105 / 12%), transparent 40%),
+        radial-gradient(ellipse at 100% 70%, rgb(31 112 68 / 17%), transparent 44%),
+        var(--nf-sidebar-surface);
+    box-shadow: 9px 0 38px rgb(0 0 0 / 22%);
+}
+
+.nf-sidebar-brand {
+    position: relative;
+    background: linear-gradient(115deg, rgb(243 201 105 / 8%), transparent 65%);
+    border-bottom-color: color-mix(in srgb, var(--nf-sidebar-border) 65%, #f3c969 35%);
+}
+
+.nf-brand-mark {
+    position: relative;
+    border-color: rgb(243 201 105 / 45%);
+    box-shadow: 0 0 0 3px rgb(243 201 105 / 7%), 0 4px 16px rgb(243 201 105 / 12%);
+    transition: transform .28s ease, box-shadow .28s ease;
+}
+
+.nf-brand-link:hover .nf-brand-mark {
+    transform: translateY(-2px) rotate(-2deg);
+    box-shadow: 0 0 0 4px rgb(243 201 105 / 10%), 0 0 24px rgb(243 201 105 / 23%);
+}
+
+.nf-brand-copy strong {
+    text-shadow: 0 0 22px rgb(243 201 105 / 13%);
+}
+
+.nf-brand-copy span {
+    transition: color .25s ease;
+}
+
+.nf-brand-link:hover .nf-brand-copy span {
+    color: #b78b32;
+}
+
+.theme-dark .nf-brand-link:hover .nf-brand-copy span,
+html.dark .nf-brand-link:hover .nf-brand-copy span {
+    color: var(--nf-gold-bright);
+}
+
+.nf-sidebar-close {
+    transition: background .22s ease, color .22s ease, border-color .22s ease, transform .22s ease, box-shadow .22s ease;
+}
+
+.nf-sidebar-close:hover {
+    transform: translateX(-2px);
+    border-color: rgb(243 201 105 / 60%);
+    box-shadow: 0 0 18px rgb(243 201 105 / 13%);
+}
+
+.nf-nav-heading {
+    position: relative;
+}
+
+.nf-nav-heading span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nf-nav-heading span::before {
+    content: "";
+    display: inline-block;
+    width: 17px;
+    height: 2px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #e9b94e, #f6df9f);
+    box-shadow: 0 0 9px rgb(243 201 105 / 25%);
+}
+
+.nf-nav-link {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid transparent;
+    transition:
+        transform .23s ease,
+        background .23s ease,
+        color .23s ease,
+        border-color .23s ease,
+        box-shadow .23s ease;
+}
+
+.nf-nav-link::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(105deg, rgb(243 201 105 / 15%), transparent 72%);
+    transition: opacity .23s ease;
+}
+
+.nf-nav-link:hover {
+    transform: translateX(3px);
+    border-color: rgb(243 201 105 / 27%);
+    box-shadow: 0 5px 16px rgb(24 65 38 / 6%);
+}
+
+.nf-nav-link:hover::before {
+    opacity: 1;
+}
+
+.nf-nav-link-active {
+    border-color: rgb(243 201 105 / 42%);
+    background: linear-gradient(105deg, rgb(243 201 105 / 19%), rgb(33 134 83 / 7%));
+    box-shadow: inset 3px 0 0 #e9bb58, 0 5px 17px rgb(33 90 50 / 7%);
+}
+
+.theme-dark .nf-nav-link-active,
+html.dark .nf-nav-link-active {
+    background: linear-gradient(105deg, rgb(243 201 105 / 15%), rgb(52 211 153 / 8%));
+    border-color: rgb(243 201 105 / 32%);
+    box-shadow: inset 3px 0 0 #f3c969, 0 5px 18px rgb(0 0 0 / 12%);
+}
+
+.nf-nav-icon {
+    transition: transform .24s ease, color .24s ease, filter .24s ease;
+}
+
+.nf-nav-link:hover .nf-nav-icon {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 5px rgb(243 201 105 / 25%));
+}
+
+.nf-nav-link-active .nf-nav-icon {
+    /* Keep the icon white against the green active background for clear contrast. */
+    color: #ffffff;
+}
+
+.theme-dark .nf-nav-link-active .nf-nav-icon,
+html.dark .nf-nav-link-active .nf-nav-icon {
+    color: #ffffff;
+}
+
+.nf-nav-active-dot {
+    box-shadow: 0 0 0 3px rgb(243 201 105 / 12%), 0 0 10px rgb(243 201 105 / 35%);
+    animation: nf-active-dot-pulse 2.6s ease-in-out infinite;
+}
+
+.nf-sidebar-note {
+    position: relative;
+    overflow: hidden;
+    border-color: color-mix(in srgb, var(--nf-sidebar-border) 70%, #f3c969 30%);
+    background-image: linear-gradient(125deg, rgb(243 201 105 / 9%), transparent 68%);
+    transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
+}
+
+.nf-sidebar-note:hover {
+    transform: translateY(-2px);
+    border-color: rgb(243 201 105 / 55%);
+    box-shadow: 0 8px 23px rgb(33 90 50 / 9%), 0 0 16px rgb(243 201 105 / 8%);
+}
+
+.nf-sidebar-note.is-active {
+    border-color: rgb(243 201 105 / 60%);
+    box-shadow: inset 3px 0 0 #e9bb58, 0 5px 18px rgb(33 90 50 / 8%);
+}
+
+.nf-user-card {
+    border-top-color: color-mix(in srgb, var(--nf-sidebar-border) 65%, #f3c969 35%);
+    background: linear-gradient(120deg, rgb(243 201 105 / 8%), transparent 75%);
+}
+
+.nf-user-avatar {
+    box-shadow: 0 0 0 3px rgb(243 201 105 / 12%), 0 0 18px rgb(243 201 105 / 10%);
+    transition: transform .24s ease, box-shadow .24s ease;
+}
+
+.nf-user-card:hover .nf-user-avatar {
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 4px rgb(243 201 105 / 16%), 0 0 23px rgb(243 201 105 / 22%);
+}
+
+.nf-user-settings-icon,
+.nf-logout-button {
+    transition: transform .22s ease, background .22s ease, border-color .22s ease, box-shadow .22s ease;
+}
+
+.nf-user-settings-icon:hover {
+    transform: rotate(18deg);
+    border-color: rgb(243 201 105 / 50%);
+    box-shadow: 0 0 14px rgb(243 201 105 / 12%);
+}
+
+.nf-logout-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgb(180 70 55 / 10%);
+}
+
+.nf-sidebar-copyright {
+    opacity: .72;
+    transition: opacity .2s ease;
+}
+
+.nf-sidebar:hover .nf-sidebar-copyright {
+    opacity: 1;
+}
+
+.nf-sidebar-backdrop {
+    background: rgb(8 22 13 / 57%);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+@keyframes nf-sidebar-aura {
+    from { transform: translate3d(-6px, -4px, 0) scale(.92); opacity: .65; }
+    to { transform: translate3d(24px, 17px, 0) scale(1.12); opacity: 1; }
+}
+
+@keyframes nf-active-dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgb(243 201 105 / 10%), 0 0 8px rgb(243 201 105 / 22%); }
+    50% { box-shadow: 0 0 0 5px rgb(243 201 105 / 5%), 0 0 14px rgb(243 201 105 / 38%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nf-sidebar::before,
+    .nf-nav-active-dot {
+        animation: none !important;
+    }
+
+    .nf-sidebar *,
+    .nf-sidebar *::before,
+    .nf-sidebar *::after {
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+    }
+}
+
+
+
+/* Active menu: keep the original soft background; brighten only the title text. */
+.nf-nav-link.nf-nav-link-active .nf-nav-copy strong {
+    color: #16834a !important;
+    text-shadow: 0 0 10px rgb(22 131 74 / 10%);
+}
+
+.theme-dark .nf-nav-link.nf-nav-link-active .nf-nav-copy strong,
+html.dark .nf-nav-link.nf-nav-link-active .nf-nav-copy strong {
+    color: #4ade80 !important;
+    text-shadow: 0 0 12px rgb(74 222 128 / 14%);
+}
+
 </style>

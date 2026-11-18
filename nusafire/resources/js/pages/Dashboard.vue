@@ -82,6 +82,61 @@ const selectedRegionName = ref<string>('');
 const lastUpdated = ref<string>('');
 const firmsLive = ref<boolean>(false);
 const firmsTotalHotspots = ref<number>(0);
+
+// Presentation-only values for the dashboard count-up animation.
+const animatedHighRisk = ref(0);
+const animatedModerateRisk = ref(0);
+const animatedFireProbability = ref(0);
+const animatedHotspots = ref(0);
+let counterAnimationFrame = 0;
+
+function animateDashboardCounters(): void {
+    if (!summary.value) return;
+
+    if (counterAnimationFrame) cancelAnimationFrame(counterAnimationFrame);
+
+    const targets = {
+        high: Number(summary.value.high_risk_zones ?? 0),
+        moderate: Number(summary.value.moderate_risk_zones ?? 0),
+        probability: Number(summary.value.average_fire_probability_pct ?? 0),
+        hotspots: Number(firmsTotalHotspots.value ?? 0),
+    };
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+        animatedHighRisk.value = targets.high;
+        animatedModerateRisk.value = targets.moderate;
+        animatedFireProbability.value = targets.probability;
+        animatedHotspots.value = targets.hotspots;
+        return;
+    }
+
+    animatedHighRisk.value = 0;
+    animatedModerateRisk.value = 0;
+    animatedFireProbability.value = 0;
+    animatedHotspots.value = 0;
+
+    const start = performance.now();
+    const duration = 1250;
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const tick = (now: number) => {
+        const progress = Math.min(1, (now - start) / duration);
+        const eased = easeOut(progress);
+        animatedHighRisk.value = Math.round(targets.high * eased);
+        animatedModerateRisk.value = Math.round(targets.moderate * eased);
+        animatedFireProbability.value = targets.probability * eased;
+        animatedHotspots.value = Math.round(targets.hotspots * eased);
+
+        if (progress < 1) {
+            counterAnimationFrame = requestAnimationFrame(tick);
+        } else {
+            counterAnimationFrame = 0;
+        }
+    };
+
+    counterAnimationFrame = requestAnimationFrame(tick);
+}
 const hoveredPoint = ref<{
     x: number;
     y: number;
@@ -735,28 +790,42 @@ onMounted(() => {
                         </p>
                     </div>
 
-                    <div class="nf-heading-card">
-                        <div class="nf-heading-card-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <circle cx="12" cy="12" r="10" />
-                                <polyline points="12 6 12 12 16 14" />
+                    <div class="nf-heading-actions">
+                        <div class="nf-heading-card">
+                            <div class="nf-heading-card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="5" />
+                                    <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
+                            <div>
+                                <strong>Real-Time Weather &amp; Risk</strong>
+
+                                <span v-if="loading">
+                                    38 Provinces Monitored
+                                </span>
+
+                                <span v-else-if="apiError">
+                                    Data unavailable
+                                </span>
+
+                                <span v-else>
+                                    {{ lastUpdated }} WIB
+                                </span>
+                            </div>
+                        </div>
+
+                        <button
+                            class="nf-refresh-button"
+                            type="button"
+                            :disabled="loading"
+                            @click="loadDashboard"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16" aria-hidden="true" :class="{ 'spin-anim': loading }">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19" stroke-linecap="round" stroke-linejoin="round" />
                             </svg>
-                        </div>
-                        <div>
-                            <strong>Real-Time Satellite &amp; AI</strong>
-
-                            <span v-if="loading">
-                                Loading satellite &amp; weather data...
-                            </span>
-
-                            <span v-else-if="apiError">
-                                Data unavailable
-                            </span>
-
-                            <span v-else>
-                                {{ lastUpdated }} WIB
-                            </span>
-                        </div>
+                            {{ loading ? 'Loading data...' : 'Refresh data' }}
+                        </button>
                     </div>
                 </section>
 
@@ -793,7 +862,7 @@ onMounted(() => {
                             {{
                                 loading
                                     ? '—'
-                                    : formatNumber(summary?.high_risk_zones)
+                                    : formatNumber(animatedHighRisk)
                             }}
                         </div>
 
@@ -825,7 +894,7 @@ onMounted(() => {
                             {{
                                 loading
                                     ? '—'
-                                    : formatNumber(summary?.moderate_risk_zones)
+                                    : formatNumber(animatedModerateRisk)
                             }}
                         </div>
 
@@ -857,7 +926,7 @@ onMounted(() => {
                                 loading
                                     ? '—'
                                     : formatPercent(
-                                          summary?.average_fire_probability_pct,
+                                          animatedFireProbability,
                                       )
                             }}
                         </div>
@@ -892,7 +961,7 @@ onMounted(() => {
                             {{
                                 loading
                                     ? '—'
-                                    : formatNumber(firmsTotalHotspots)
+                                    : formatNumber(animatedHotspots)
                             }}
                         </div>
 
@@ -1170,8 +1239,9 @@ onMounted(() => {
                                 v-for="(region, index) in regions"
                                 :key="region.name"
                                 type="button"
-                                class="nf-region-item"
+                                class="nf-region-item nf-region-item-animated"
                                 :class="{ 'is-active': selectedRegionName === region.name }"
+                                :style="{ '--region-index': index }"
                                 @click="selectProvince(region.name)"
                             >
                                 <div class="nf-region-top">
@@ -1210,7 +1280,7 @@ onMounted(() => {
 
                                 <div class="nf-progress-track">
                                     <div
-                                        class="nf-progress-fill"
+                                        class="nf-progress-fill nf-progress-fill-animated"
                                         :class="`is-${region.riskLevel.toLowerCase()}`"
                                         :style="{
                                             width: `${region.width}%`,
@@ -1650,12 +1720,79 @@ html.dark .nf-app {
     color: var(--db-text, #141f17);
 }
 
+.nf-app.theme-dark .nf-page-heading h1,
+html.theme-dark .nf-app .nf-page-heading h1,
+html.dark .nf-app .nf-page-heading h1 {
+    color: #ffffff;
+}
+
 .nf-page-heading p {
     margin: 0;
     color: var(--db-text-soft, #5f7065);
     font-size: 13px;
     line-height: 1.6;
     max-width: 660px;
+}
+
+.nf-heading-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.nf-refresh-button {
+    height: 52px;
+    min-height: 52px;
+    padding: 0 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    border: 1px solid var(--db-border, #d7e7dd);
+    border-radius: 12px;
+    background: var(--db-surface, #ffffff);
+    color: var(--db-accent, #165b33);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.nf-refresh-button:hover:not(:disabled) {
+    background: var(--db-surface-soft, #f0f7f3);
+    border-color: var(--db-accent, #165b33);
+}
+
+.nf-refresh-button:disabled {
+    cursor: wait;
+    opacity: .75;
+}
+
+.spin-anim {
+    animation: nf-spin 1s linear infinite;
+}
+
+@keyframes nf-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.nf-app.theme-dark .nf-refresh-button,
+html.theme-dark .nf-app .nf-refresh-button,
+html.dark .nf-app .nf-refresh-button {
+    background: var(--db-surface, #19231c);
+    border-color: var(--db-border, #2b3a2e);
+    color: var(--db-accent, #70cf98);
+}
+
+.nf-app.theme-dark .nf-refresh-button:hover:not(:disabled),
+html.theme-dark .nf-app .nf-refresh-button:hover:not(:disabled),
+html.dark .nf-app .nf-refresh-button:hover:not(:disabled) {
+    background: var(--db-surface-soft, #1d2921);
+    border-color: var(--db-accent, #70cf98);
 }
 
 .nf-heading-card,
@@ -2538,8 +2675,14 @@ html.dark .nf-app {
         font-size: 27px;
     }
 
+    .nf-heading-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
     .nf-heading-card,
-    .nf-heading-date {
+    .nf-heading-date,
+    .nf-refresh-button {
         width: 100%;
     }
 
@@ -2623,4 +2766,399 @@ html.dark .nf-app {
         transition: none !important;
     }
 }
+
+
+/* Subtle dashboard entrance and data-loading motion. Visual-only; no API behavior changed. */
+@keyframes nf-enter-up {
+    from { opacity: 0; transform: translate3d(0, 12px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes nf-chart-draw {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes nf-chart-area-reveal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes nf-point-pop {
+    from { opacity: 0; transform: scale(.65); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.nf-dashboard .nf-page-heading {
+    animation: nf-enter-up .55s cubic-bezier(.2, .7, .2, 1) both;
+}
+
+.nf-dashboard .nf-stat-card {
+    animation: nf-enter-up .6s cubic-bezier(.2, .7, .2, 1) both;
+    transition:
+        transform .22s ease,
+        box-shadow .22s ease,
+        border-color .22s ease;
+}
+
+.nf-dashboard .nf-stat-card:nth-child(1) { animation-delay: .08s; }
+.nf-dashboard .nf-stat-card:nth-child(2) { animation-delay: .16s; }
+.nf-dashboard .nf-stat-card:nth-child(3) { animation-delay: .24s; }
+.nf-dashboard .nf-stat-card:nth-child(4) { animation-delay: .32s; }
+
+.nf-dashboard .nf-stat-card:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--db-accent) 30%, var(--db-border));
+    box-shadow: 0 12px 28px rgb(23 49 33 / 7%);
+}
+
+.nf-dashboard .nf-primary-grid > .nf-panel,
+.nf-dashboard .nf-secondary-grid > .nf-panel {
+    animation: nf-enter-up .65s cubic-bezier(.2, .7, .2, 1) both;
+    animation-delay: .2s;
+}
+
+.nf-dashboard .nf-primary-grid > .nf-panel:nth-child(2),
+.nf-dashboard .nf-secondary-grid > .nf-panel:nth-child(2) {
+    animation-delay: .3s;
+}
+
+.nf-dashboard .nf-chart-line-animated {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: nf-chart-draw 1.35s cubic-bezier(.22, .61, .36, 1) .35s forwards;
+}
+
+.nf-dashboard .nf-trend-panel .nf-chart-wrap > svg path[fill="url(#nf-chart-fill)"] {
+    opacity: 0;
+    animation: nf-chart-area-reveal .8s ease-out .55s forwards;
+}
+
+.nf-dashboard .nf-chart-point {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: nf-point-pop .35s ease-out both;
+}
+
+.nf-dashboard .nf-chart-point:nth-of-type(1) { animation-delay: .38s; }
+.nf-dashboard .nf-chart-point:nth-of-type(2) { animation-delay: .48s; }
+.nf-dashboard .nf-chart-point:nth-of-type(3) { animation-delay: .58s; }
+.nf-dashboard .nf-chart-point:nth-of-type(4) { animation-delay: .68s; }
+.nf-dashboard .nf-chart-point:nth-of-type(5) { animation-delay: .78s; }
+.nf-dashboard .nf-chart-point:nth-of-type(6) { animation-delay: .88s; }
+.nf-dashboard .nf-chart-point:nth-of-type(7) { animation-delay: .98s; }
+
+.nf-dashboard .nf-status-dot {
+    box-shadow: 0 0 0 0 rgb(72 187 120 / 35%);
+    animation: nf-live-pulse 2.2s ease-out infinite;
+}
+
+@keyframes nf-live-pulse {
+    0% { box-shadow: 0 0 0 0 rgb(72 187 120 / 35%); }
+    70% { box-shadow: 0 0 0 6px rgb(72 187 120 / 0%); }
+    100% { box-shadow: 0 0 0 0 rgb(72 187 120 / 0%); }
+}
+
+/* Provincial ranking entrance: stagger each row and reveal its risk bar. */
+@keyframes nf-ranking-row-enter {
+    from { opacity: 0; transform: translate3d(0, 8px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes nf-risk-bar-grow {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+}
+
+.nf-dashboard .nf-region-item-animated {
+    animation: nf-ranking-row-enter .42s cubic-bezier(.2, .7, .2, 1) both;
+    animation-delay: calc(.24s + (var(--region-index, 0) * 45ms));
+    transition:
+        background .2s ease,
+        border-color .2s ease,
+        transform .2s ease,
+        box-shadow .2s ease;
+}
+
+.nf-dashboard .nf-region-item-animated:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgb(23 49 33 / 5%);
+}
+
+.nf-dashboard .nf-progress-fill-animated {
+    transform: scaleX(0);
+    transform-origin: left center;
+    animation: nf-risk-bar-grow .85s cubic-bezier(.22, .61, .36, 1) both;
+    animation-delay: calc(.35s + (var(--region-index, 0) * 45ms));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nf-dashboard .nf-page-heading,
+    .nf-dashboard .nf-stat-card,
+    .nf-dashboard .nf-primary-grid > .nf-panel,
+    .nf-dashboard .nf-secondary-grid > .nf-panel,
+    .nf-dashboard .nf-chart-line-animated,
+    .nf-dashboard .nf-trend-panel .nf-chart-wrap > svg path[fill="url(#nf-chart-fill)"],
+    .nf-dashboard .nf-chart-point,
+    .nf-dashboard .nf-status-dot,
+    .nf-dashboard .nf-region-item-animated,
+    .nf-dashboard .nf-progress-fill-animated {
+        animation: none !important;
+        transition: none !important;
+        opacity: 1 !important;
+        stroke-dashoffset: 0 !important;
+        transform: none !important;
+    }
+}
+
+
+
+/* NusaFire lively visual polish — presentation-only CSS overrides.
+   API calls, reactive state, routes, event handlers, and configuration are unchanged. */
+.nf-dashboard {
+    position: relative;
+    isolation: isolate;
+    background-image:
+        radial-gradient(ellipse at 88% 5%, rgb(225 177 67 / 10%), transparent 28rem),
+        radial-gradient(ellipse at 12% 34%, rgb(45 138 91 / 7%), transparent 32rem);
+    background-attachment: fixed;
+}
+
+.nf-dashboard.theme-dark {
+    background-image:
+        radial-gradient(ellipse at 88% 5%, rgb(220 173 63 / 9%), transparent 29rem),
+        radial-gradient(ellipse at 12% 34%, rgb(62 157 99 / 9%), transparent 32rem);
+}
+
+.nf-dashboard .nf-topbar {
+    position: sticky;
+    isolation: isolate;
+    overflow: hidden;
+    box-shadow: 0 5px 22px rgb(31 62 42 / 3%);
+}
+
+.nf-dashboard .nf-topbar::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #d7ad4b 28%, #4b9c6c 58%, transparent 100%);
+    opacity: .72;
+    pointer-events: none;
+}
+
+.nf-dashboard .nf-live-indicator {
+    padding: 8px 11px;
+    border: 1px solid color-mix(in srgb, var(--db-accent) 16%, var(--db-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--db-accent-soft) 58%, var(--db-surface));
+}
+
+.nf-dashboard .nf-status-dot {
+    box-shadow: 0 0 0 4px rgb(72 187 120 / 9%), 0 0 12px rgb(72 187 120 / 25%);
+}
+
+.nf-dashboard .nf-content {
+    position: relative;
+}
+
+.nf-dashboard .nf-page-heading {
+    position: relative;
+}
+
+.nf-dashboard .nf-page-heading::before {
+    content: "";
+    position: absolute;
+    top: -35px;
+    left: -32px;
+    width: 220px;
+    height: 150px;
+    background: radial-gradient(ellipse, rgb(221 178 72 / 10%), transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+.nf-dashboard .nf-eyebrow {
+    color: #a98224;
+}
+
+.nf-dashboard.theme-dark .nf-eyebrow {
+    color: #e2c36c;
+}
+
+.nf-dashboard .nf-eyebrow-line {
+    background: linear-gradient(90deg, #d8ae45, var(--db-accent));
+    box-shadow: 0 0 10px rgb(216 174 69 / 25%);
+}
+
+.nf-dashboard .nf-heading-card,
+.nf-dashboard .nf-refresh-button,
+.nf-dashboard .nf-theme-toggle,
+.nf-dashboard .nf-icon-button {
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease,
+        background .2s ease,
+        border-color .2s ease,
+        color .2s ease;
+}
+
+.nf-dashboard .nf-heading-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.nf-dashboard .nf-heading-card::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+    background: linear-gradient(180deg, #e6c76e, var(--db-accent));
+    opacity: .85;
+}
+
+.nf-dashboard .nf-heading-card-icon {
+    box-shadow: inset 0 0 0 1px rgb(45 138 91 / 5%);
+}
+
+.nf-dashboard .nf-refresh-button {
+    box-shadow: 0 4px 14px rgb(35 92 56 / 5%);
+}
+
+.nf-dashboard .nf-refresh-button:hover:not(:disabled),
+.nf-dashboard .nf-theme-toggle:hover,
+.nf-dashboard .nf-icon-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 7px 18px rgb(35 92 56 / 10%);
+}
+
+.nf-dashboard .nf-stat-card,
+.nf-dashboard .nf-panel {
+    position: relative;
+    overflow: hidden;
+    transition:
+        transform .23s ease,
+        border-color .23s ease,
+        box-shadow .23s ease,
+        background .23s ease;
+}
+
+.nf-dashboard .nf-stat-card::before,
+.nf-dashboard .nf-panel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 18px;
+    right: 18px;
+    height: 2px;
+    border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, transparent, rgb(218 177 73 / 78%), rgb(45 138 91 / 65%), transparent);
+    opacity: .52;
+    transition: opacity .2s ease;
+    pointer-events: none;
+}
+
+.nf-dashboard .nf-stat-card:hover::before,
+.nf-dashboard .nf-panel:hover::before {
+    opacity: 1;
+}
+
+.nf-dashboard .nf-stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 13px 30px rgb(28 65 42 / 9%);
+}
+
+.nf-dashboard.theme-dark .nf-stat-card:hover,
+.nf-dashboard.theme-dark .nf-panel:hover {
+    box-shadow: 0 13px 30px rgb(0 0 0 / 18%);
+}
+
+.nf-dashboard .nf-stat-icon {
+    transition: transform .24s ease, box-shadow .24s ease;
+}
+
+.nf-dashboard .nf-stat-card:hover .nf-stat-icon {
+    transform: translateY(-2px) rotate(-4deg);
+    box-shadow: 0 5px 12px rgb(36 95 58 / 9%);
+}
+
+.nf-dashboard .nf-stat-value {
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 2px 16px rgb(45 138 91 / 5%);
+}
+
+.nf-dashboard .nf-panel-heading h2 {
+    letter-spacing: -.35px;
+}
+
+.nf-dashboard .nf-filter-pills {
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 2%);
+}
+
+.nf-dashboard .nf-pill-btn.active {
+    background: linear-gradient(135deg, var(--db-accent), color-mix(in srgb, var(--db-accent) 78%, #174d30));
+    box-shadow: 0 3px 9px rgb(45 138 91 / 20%);
+}
+
+.nf-dashboard .nf-select:focus-visible,
+.nf-dashboard button:focus-visible {
+    outline: 2px solid #d7ad4b;
+    outline-offset: 3px;
+}
+
+.nf-dashboard .nf-chart-line {
+    filter: drop-shadow(0 2px 3px rgb(67 169 120 / 14%));
+}
+
+.nf-dashboard .nf-chart-point:hover,
+.nf-dashboard .nf-chart-point.is-hovered {
+    filter: drop-shadow(0 0 5px rgb(67 169 120 / 32%));
+}
+
+.nf-dashboard .nf-region-item-animated:hover {
+    background: color-mix(in srgb, var(--db-accent-soft) 42%, var(--db-surface));
+    border-color: color-mix(in srgb, var(--db-accent) 22%, var(--db-border));
+}
+
+.nf-dashboard .nf-footer {
+    position: relative;
+}
+
+.nf-dashboard .nf-footer::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: min(260px, 45%);
+    height: 1px;
+    background: linear-gradient(90deg, rgb(218 177 73 / 75%), transparent);
+}
+
+@media (max-width: 600px) {
+    .nf-dashboard .nf-page-heading::before {
+        left: -14px;
+        width: 160px;
+    }
+
+    .nf-dashboard .nf-stat-card:hover {
+        transform: translateY(-2px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nf-dashboard .nf-heading-card,
+    .nf-dashboard .nf-refresh-button,
+    .nf-dashboard .nf-theme-toggle,
+    .nf-dashboard .nf-icon-button,
+    .nf-dashboard .nf-stat-card,
+    .nf-dashboard .nf-panel,
+    .nf-dashboard .nf-stat-icon {
+        transition: none !important;
+        transform: none !important;
+    }
+}
+
 </style>

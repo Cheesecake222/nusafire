@@ -122,7 +122,13 @@ const featuresList = [
                     <article class="nf-summary-card">
                         <div class="nf-card-top">
                             <span class="nf-card-title">ML Algorithm</span>
-                            <span class="nf-card-icon icon-ai">🧠</span>
+                            <span class="nf-card-icon nf-icon-green">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                                    <rect x="9" y="9" width="6" height="6" />
+                                    <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" />
+                                </svg>
+                            </span>
                         </div>
                         <div class="nf-card-value">XGBoost</div>
                         <div class="nf-card-sub">150 Estimators · Tuned Gradient Boosting</div>
@@ -131,7 +137,13 @@ const featuresList = [
                     <article class="nf-summary-card">
                         <div class="nf-card-top">
                             <span class="nf-card-title">Training Datasets</span>
-                            <span class="nf-card-icon icon-data">📊</span>
+                            <span class="nf-card-icon nf-icon-orange">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <ellipse cx="12" cy="5" rx="9" ry="3" />
+                                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                                </svg>
+                            </span>
                         </div>
                         <div class="nf-card-value">3 Sources</div>
                         <div class="nf-card-sub">NASA FIRMS, NASA POWER, MapBiomas</div>
@@ -140,7 +152,13 @@ const featuresList = [
                     <article class="nf-summary-card">
                         <div class="nf-card-top">
                             <span class="nf-card-title">Real-Time APIs</span>
-                            <span class="nf-card-icon icon-api">🌐</span>
+                            <span class="nf-card-icon nf-icon-blue">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="2" y1="12" x2="22" y2="12" />
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                </svg>
+                            </span>
                         </div>
                         <div class="nf-card-value">2 Live Feeds</div>
                         <div class="nf-card-sub">NASA FIRMS (VIIRS 375m) &amp; Open-Meteo</div>
@@ -149,7 +167,15 @@ const featuresList = [
                     <article class="nf-summary-card">
                         <div class="nf-card-top">
                             <span class="nf-card-title">Monitored Scope</span>
-                            <span class="nf-card-icon icon-sat">🛰️</span>
+                            <span class="nf-card-icon nf-icon-yellow">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="22" y1="12" x2="18" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="6" y1="12" x2="2" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="6" x2="12" y2="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="22" x2="12" y2="18" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </span>
                         </div>
                         <div class="nf-card-value">38 Provinces</div>
                         <div class="nf-card-sub">National multi-source risk prediction</div>
@@ -169,7 +195,13 @@ const featuresList = [
                     <div class="nf-pipeline-steps-grid">
                         <div class="nf-pipeline-card">
                             <div class="nf-step-badge">STEP 01</div>
-                            <div class="nf-step-icon">📡</div>
+                            <div class="nf-step-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                    <path d="M4 11a9 9 0 0 1 9 9" stroke-linecap="round" />
+                                    <path d="M4 4a16 16 0 0 1 16 16" stroke-linecap="round" />
+                                    <circle cx="5" cy="19" r="1.5" fill="currentColor" />
+                                </svg>
+                            </div>
                             <h4>Multi-Source Ingestion</h4>
                             <p>Near real-time retrieval of active thermal anomalies via <strong>NASA FIRMS API</strong> (VIIRS 375m &amp; MODIS) combined with hourly &amp; 14-day forecasts from <strong>Open-Meteo API</strong>.</p>
                             <div class="nf-step-tags">
@@ -178,11 +210,22 @@ const featuresList = [
                             </div>
                         </div>
 
-                        <div class="nf-pipeline-arrow-col">➔</div>
+                        <div class="nf-pipeline-arrow-col">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18" aria-hidden="true">
+                                <line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                <polyline points="12 5 19 12 12 19" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
 
                         <div class="nf-pipeline-card">
                             <div class="nf-step-badge">STEP 02</div>
-                            <div class="nf-step-icon">🗺️</div>
+                            <div class="nf-step-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="8" y1="2" x2="8" y2="18" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="16" y1="6" x2="16" y2="22" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
                             <h4>Spatial &amp; Biomass Fusion</h4>
                             <p>Spatial join matching coordinates with <strong>MapBiomas 2024 LULC</strong> raster to determine fuel flammability, peat depth vulnerability, and canopy moisture retention.</p>
                             <div class="nf-step-tags">
@@ -191,11 +234,22 @@ const featuresList = [
                             </div>
                         </div>
 
-                        <div class="nf-pipeline-arrow-col">➔</div>
+                        <div class="nf-pipeline-arrow-col">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18" aria-hidden="true">
+                                <line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                <polyline points="12 5 19 12 12 19" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
 
                         <div class="nf-pipeline-card">
                             <div class="nf-step-badge">STEP 03</div>
-                            <div class="nf-step-icon">🧠</div>
+                            <div class="nf-step-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                                    <rect x="9" y="9" width="6" height="6" />
+                                    <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" stroke-linecap="round" />
+                                </svg>
+                            </div>
                             <h4>XGBoost ML Inference</h4>
                             <p>A 9-feature environmental vector is fed into the <strong>XGBoost Classifier</strong> (150 trees, threshold 0.35) producing calibrated fire probabilities.</p>
                             <div class="nf-step-tags">
@@ -204,11 +258,21 @@ const featuresList = [
                             </div>
                         </div>
 
-                        <div class="nf-pipeline-arrow-col">➔</div>
+                        <div class="nf-pipeline-arrow-col">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18" aria-hidden="true">
+                                <line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                <polyline points="12 5 19 12 12 19" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
 
                         <div class="nf-pipeline-card nf-card-highlight">
                             <div class="nf-step-badge badge-alert">STEP 04</div>
-                            <div class="nf-step-icon">🚨</div>
+                            <div class="nf-step-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke-linecap="round" stroke-linejoin="round" />
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
                             <h4>Early Warning Output</h4>
                             <p>Calibrated risk scores mapped across <strong>38 Indonesian provinces</strong>, generating diurnal 24h curves, 7/14-day outlooks, and operational alert triggers.</p>
                             <div class="nf-step-tags">
@@ -224,7 +288,13 @@ const featuresList = [
                     <!-- Column 1: DATASETS -->
                     <article class="nf-panel nf-spec-card">
                         <div class="nf-spec-header">
-                            <div class="nf-spec-icon icon-data">📊</div>
+                            <div class="nf-spec-icon icon-data">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                    <ellipse cx="12" cy="5" rx="9" ry="3" />
+                                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                                </svg>
+                            </div>
                             <div>
                                 <div class="nf-panel-eyebrow">DATA SPECIFICATIONS</div>
                                 <h2>Training Datasets &amp; Spatial Layers</h2>
@@ -273,7 +343,13 @@ const featuresList = [
                     <!-- Column 2: MACHINE LEARNING MODEL -->
                     <article class="nf-panel nf-spec-card">
                         <div class="nf-spec-header">
-                            <div class="nf-spec-icon icon-ai">🧠</div>
+                            <div class="nf-spec-icon icon-ai">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                                    <rect x="9" y="9" width="6" height="6" />
+                                    <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" stroke-linecap="round" />
+                                </svg>
+                            </div>
                             <div>
                                 <div class="nf-panel-eyebrow">MODEL SPECIFICATIONS</div>
                                 <h2>Machine Learning: XGBoost Classifier</h2>
@@ -327,7 +403,13 @@ const featuresList = [
                     <!-- Column 3: APIS & REAL-TIME TELEMETRY -->
                     <article class="nf-panel nf-spec-card">
                         <div class="nf-spec-header">
-                            <div class="nf-spec-icon icon-api">🌐</div>
+                            <div class="nf-spec-icon icon-api">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="2" y1="12" x2="22" y2="12" />
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                </svg>
+                            </div>
                             <div>
                                 <div class="nf-panel-eyebrow">API SPECIFICATIONS</div>
                                 <h2>Integrated APIs &amp; Live Telemetry</h2>
@@ -415,7 +497,15 @@ const featuresList = [
                 <!-- Navigation Action Cards -->
                 <section class="nf-action-cards-grid">
                     <Link href="/hotspot-map" class="nf-action-card">
-                        <div class="nf-action-icon">🛰️</div>
+                        <div class="nf-action-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round" />
+                                <line x1="22" y1="12" x2="18" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                <line x1="6" y1="12" x2="2" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                <line x1="12" y1="6" x2="12" y2="2" stroke-linecap="round" stroke-linejoin="round" />
+                                <line x1="12" y1="22" x2="12" y2="18" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
                         <div class="nf-action-text">
                             <strong>Hotspot Map</strong>
                             <span>Pure NASA FIRMS satellite observation &amp; historical dataset</span>
@@ -424,7 +514,19 @@ const featuresList = [
                     </Link>
 
                     <Link href="/weather-analysis" class="nf-action-card">
-                        <div class="nf-action-icon">☀️</div>
+                        <div class="nf-action-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                <circle cx="12" cy="12" r="5" />
+                                <line x1="12" y1="1" x2="12" y2="3" stroke-linecap="round" />
+                                <line x1="12" y1="21" x2="12" y2="23" stroke-linecap="round" />
+                                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-linecap="round" />
+                                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-linecap="round" />
+                                <line x1="1" y1="12" x2="3" y2="12" stroke-linecap="round" />
+                                <line x1="21" y1="12" x2="23" y2="12" stroke-linecap="round" />
+                                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-linecap="round" />
+                                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-linecap="round" />
+                            </svg>
+                        </div>
                         <div class="nf-action-text">
                             <strong>Weather Analysis</strong>
                             <span>Pure Open-Meteo meteorological parameters &amp; climate summary</span>
@@ -433,7 +535,11 @@ const featuresList = [
                     </Link>
 
                     <Link href="/ai-prediction" class="nf-action-card card-ai">
-                        <div class="nf-action-icon">⚡</div>
+                        <div class="nf-action-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
                         <div class="nf-action-text">
                             <strong>AI Prediction &amp; Risk Forecast</strong>
                             <span>Execute calibrated XGBoost model across all 38 provinces</span>
@@ -448,28 +554,51 @@ const featuresList = [
 
 <style scoped>
 .nf-forestwatch-page {
-    --page-bg: #f8fafc;
+    --page-bg: #f5f7f4;
     --surface-bg: #ffffff;
-    --text-main: #0f172a;
-    --text-muted: #64748b;
-    --border-color: #e2e8f0;
-    --primary: #15803d;
-    --primary-light: rgba(21, 128, 61, 0.08);
+    --text-main: #1c2922;
+    --text-muted: #526158;
+    --border-color: #e5eae4;
+    --primary: #2d8a5b;
+    --primary-light: rgba(45, 138, 91, 0.08);
+
+    --db-bg: #f5f7f4;
+    --db-surface: #fff;
+    --db-surface-soft: #f8faf7;
+    --db-text: #1c2922;
+    --db-text-soft: #526158;
+    --db-muted: #859087;
+    --db-border: #e5eae4;
+    --db-accent: #2d8a5b;
+    --db-accent-soft: #e8f5ec;
+
     display: flex;
     min-height: 100vh;
     background: var(--page-bg);
     color: var(--text-main);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.nf-forestwatch-page.theme-dark {
-    --page-bg: #0b1319;
-    --surface-bg: #13222d;
-    --text-main: #f1f5f9;
-    --text-muted: #94a3b8;
-    --border-color: #1e3344;
-    --primary: #22c55e;
-    --primary-light: rgba(34, 197, 94, 0.12);
+.nf-forestwatch-page.theme-dark,
+html.theme-dark .nf-forestwatch-page,
+html.dark .nf-forestwatch-page {
+    --page-bg: #111914;
+    --surface-bg: #19231c;
+    --text-main: #edf4ed;
+    --text-muted: #b0bdb2;
+    --border-color: #2b3a2e;
+    --primary: #70cf98;
+    --primary-light: rgba(112, 207, 152, 0.12);
+
+    --db-bg: #111914;
+    --db-surface: #19231c;
+    --db-surface-soft: #1d2921;
+    --db-text: #edf4ed;
+    --db-text-soft: #b0bdb2;
+    --db-muted: #849489;
+    --db-border: #2b3a2e;
+    --db-accent: #70cf98;
+    --db-accent-soft: #213b2b;
 }
 
 .nf-main {
@@ -666,7 +795,57 @@ const featuresList = [
 }
 
 .nf-card-icon {
-    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    flex-shrink: 0;
+}
+
+.nf-icon-orange {
+    color: #d27d42;
+    background: #fff0e3;
+}
+
+.nf-icon-yellow {
+    color: #c49a31;
+    background: #fff6d9;
+}
+
+.nf-icon-green {
+    color: #2f9860;
+    background: #e5f5e9;
+}
+
+.nf-icon-blue {
+    color: #508ec5;
+    background: #e7f3ff;
+}
+
+.theme-dark .nf-icon-orange,
+html.dark .nf-icon-orange {
+    color: #f97316;
+    background: rgba(249, 115, 22, 0.15);
+}
+
+.theme-dark .nf-icon-yellow,
+html.dark .nf-icon-yellow {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+}
+
+.theme-dark .nf-icon-green,
+html.dark .nf-icon-green {
+    color: #70cf98;
+    background: rgba(112, 207, 152, 0.15);
+}
+
+.theme-dark .nf-icon-blue,
+html.dark .nf-icon-blue {
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.15);
 }
 
 .nf-card-value {
@@ -767,7 +946,22 @@ const featuresList = [
 }
 
 .nf-step-icon {
-    font-size: 22px;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--page-bg);
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.nf-pipeline-card.nf-card-highlight .nf-step-icon {
+    color: #dc2626;
+    border-color: rgba(220, 38, 38, 0.25);
+    background: rgba(220, 38, 38, 0.06);
 }
 
 .nf-pipeline-card h4 {
@@ -801,10 +995,10 @@ const featuresList = [
 }
 
 .nf-pipeline-arrow-col {
-    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--primary);
-    font-weight: 700;
-    text-align: center;
 }
 
 /* 3-Column Specifications Grid */
@@ -840,7 +1034,7 @@ const featuresList = [
     border: 1px solid var(--border-color);
     display: grid;
     place-items: center;
-    font-size: 19px;
+    color: var(--primary);
     flex: 0 0 40px;
 }
 
@@ -892,7 +1086,7 @@ const featuresList = [
 .tag-model {
     background: var(--primary-light);
     color: var(--primary);
-    border-color: rgba(21, 128, 61, 0.2);
+    border-color: color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 .nf-detail-item p {
@@ -1020,11 +1214,10 @@ const featuresList = [
 
 .card-ai {
     background: var(--primary-light);
-    border-color: rgba(21, 128, 61, 0.25);
+    border-color: color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 .nf-action-icon {
-    font-size: 24px;
     width: 42px;
     height: 42px;
     border-radius: 10px;
@@ -1032,6 +1225,7 @@ const featuresList = [
     border: 1px solid var(--border-color);
     display: grid;
     place-items: center;
+    color: var(--primary);
     flex: 0 0 42px;
 }
 
@@ -1062,4 +1256,239 @@ const featuresList = [
 .nf-action-card:hover .nf-action-arrow {
     transform: translateX(4px);
 }
+
+
+/* NusaFire Forest Watch visual polish — CSS only */
+.nf-forestwatch-page {
+    background:
+        radial-gradient(ellipse at 8% 4%, rgba(217, 174, 72, 0.10), transparent 28%),
+        radial-gradient(ellipse at 88% 16%, rgba(45, 138, 91, 0.10), transparent 30%),
+        var(--page-bg);
+}
+
+.nf-forestwatch-page .nf-topbar {
+    background: color-mix(in srgb, var(--surface-bg) 91%, transparent);
+    backdrop-filter: blur(16px);
+    border-bottom-color: color-mix(in srgb, var(--primary) 22%, var(--border-color));
+    box-shadow: 0 4px 22px rgba(24, 56, 37, 0.035);
+}
+
+.nf-forestwatch-page .nf-topbar-left h1 {
+    background: linear-gradient(100deg, var(--text-main) 12%, var(--primary) 82%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.nf-forestwatch-page .nf-icon-button {
+    transition: transform .22s ease, box-shadow .22s ease, background .22s ease, border-color .22s ease;
+}
+
+.nf-forestwatch-page .nf-icon-button:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--primary) 45%, var(--border-color));
+    box-shadow: 0 7px 18px rgba(45, 138, 91, .12);
+}
+
+.nf-forestwatch-page .nf-page-content {
+    position: relative;
+    isolation: isolate;
+}
+
+.nf-forestwatch-page .nf-page-heading {
+    animation: fw-rise-in .55s ease both;
+}
+
+.nf-forestwatch-page .nf-eyebrow-line {
+    width: 24px;
+    background: linear-gradient(90deg, #d7ad46, var(--primary));
+    box-shadow: 0 0 12px rgba(215, 173, 70, .32);
+}
+
+.nf-forestwatch-page .nf-heading-text h1 {
+    text-wrap: balance;
+}
+
+.nf-forestwatch-page .nf-heading-card {
+    position: relative;
+    overflow: hidden;
+    background:
+        linear-gradient(125deg, color-mix(in srgb, var(--primary-light) 55%, var(--surface-bg)), var(--surface-bg) 72%);
+    border-color: color-mix(in srgb, var(--primary) 28%, var(--border-color));
+    box-shadow: 0 9px 28px rgba(34, 88, 56, .07);
+}
+
+.nf-forestwatch-page .nf-heading-card::after {
+    content: "";
+    position: absolute;
+    top: -55%;
+    right: -20%;
+    width: 110px;
+    height: 190%;
+    transform: rotate(28deg);
+    background: linear-gradient(90deg, transparent, rgba(225, 190, 100, .12), transparent);
+    pointer-events: none;
+}
+
+.nf-forestwatch-page .nf-heading-card-icon {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 16%, var(--surface-bg)), var(--primary-light));
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--primary-light) 60%, transparent);
+}
+
+.nf-forestwatch-page .nf-summary-card {
+    position: relative;
+    overflow: hidden;
+    border-color: color-mix(in srgb, var(--primary) 15%, var(--border-color));
+    box-shadow: 0 5px 18px rgba(27, 66, 43, .035);
+    animation: fw-rise-in .55s ease both;
+    transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease;
+}
+
+.nf-forestwatch-page .nf-summary-card:nth-child(2) { animation-delay: .07s; }
+.nf-forestwatch-page .nf-summary-card:nth-child(3) { animation-delay: .14s; }
+.nf-forestwatch-page .nf-summary-card:nth-child(4) { animation-delay: .21s; }
+
+.nf-forestwatch-page .nf-summary-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), #d9b653 70%, transparent);
+    opacity: .7;
+}
+
+.nf-forestwatch-page .nf-summary-card:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--primary) 38%, var(--border-color));
+    box-shadow: 0 14px 30px rgba(27, 66, 43, .09);
+}
+
+.nf-forestwatch-page .nf-card-icon {
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.nf-forestwatch-page .nf-summary-card:hover .nf-card-icon {
+    transform: translateY(-2px) rotate(-4deg);
+    box-shadow: 0 5px 12px rgba(33, 91, 55, .10);
+}
+
+.nf-forestwatch-page .nf-panel {
+    position: relative;
+    border-color: color-mix(in srgb, var(--primary) 14%, var(--border-color));
+    box-shadow: 0 7px 24px rgba(27, 66, 43, .035);
+    animation: fw-rise-in .62s ease both;
+    transition: border-color .22s ease, box-shadow .22s ease;
+}
+
+.nf-forestwatch-page .nf-panel:hover {
+    border-color: color-mix(in srgb, var(--primary) 28%, var(--border-color));
+    box-shadow: 0 11px 28px rgba(27, 66, 43, .055);
+}
+
+.nf-forestwatch-page .nf-panel-eyebrow {
+    color: var(--primary);
+}
+
+.nf-forestwatch-page .nf-spec-icon,
+.nf-forestwatch-page .nf-step-icon,
+.nf-forestwatch-page .nf-action-icon {
+    transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.nf-forestwatch-page .nf-spec-card:hover .nf-spec-icon,
+.nf-forestwatch-page .nf-pipeline-card:hover .nf-step-icon,
+.nf-forestwatch-page .nf-action-card:hover .nf-action-icon {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--primary) 38%, var(--border-color));
+    box-shadow: 0 5px 14px rgba(45, 138, 91, .10);
+}
+
+.nf-forestwatch-page .nf-pipeline-card {
+    transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+}
+
+.nf-forestwatch-page .nf-pipeline-card:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--primary) 35%, var(--border-color));
+    box-shadow: 0 9px 20px rgba(27, 66, 43, .055);
+}
+
+.nf-forestwatch-page .nf-card-highlight {
+    background:
+        radial-gradient(ellipse at 100% 0%, rgba(217, 174, 72, .09), transparent 48%),
+        color-mix(in srgb, var(--primary-light) 50%, var(--surface-bg));
+}
+
+.nf-forestwatch-page .nf-action-card {
+    box-shadow: 0 4px 15px rgba(27, 66, 43, .035);
+}
+
+.nf-forestwatch-page .nf-action-card:hover {
+    box-shadow: 0 12px 26px rgba(27, 66, 43, .085);
+}
+
+.nf-forestwatch-page .nf-table-scroll {
+    border-color: color-mix(in srgb, var(--primary) 16%, var(--border-color));
+    border-radius: 12px;
+}
+
+.nf-forestwatch-page .nf-table thead th {
+    background: color-mix(in srgb, var(--primary-light) 78%, var(--surface-bg));
+}
+
+.nf-forestwatch-page .nf-table tbody tr {
+    transition: background .18s ease;
+}
+
+.nf-forestwatch-page .nf-table tbody tr:hover {
+    background: color-mix(in srgb, var(--primary-light) 55%, transparent);
+}
+
+.nf-forestwatch-page.theme-dark {
+    background:
+        radial-gradient(ellipse at 8% 4%, rgba(214, 174, 75, .055), transparent 29%),
+        radial-gradient(ellipse at 88% 16%, rgba(75, 173, 112, .075), transparent 30%),
+        var(--page-bg);
+}
+
+.nf-forestwatch-page.theme-dark .nf-heading-card,
+.nf-forestwatch-page.theme-dark .nf-summary-card,
+.nf-forestwatch-page.theme-dark .nf-panel,
+.nf-forestwatch-page.theme-dark .nf-action-card {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+}
+
+.nf-forestwatch-page.theme-dark .nf-summary-card:hover,
+.nf-forestwatch-page.theme-dark .nf-panel:hover,
+.nf-forestwatch-page.theme-dark .nf-action-card:hover {
+    box-shadow: 0 13px 30px rgba(0, 0, 0, .2);
+}
+
+@keyframes fw-rise-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nf-forestwatch-page *,
+    .nf-forestwatch-page *::before,
+    .nf-forestwatch-page *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+@media (max-width: 700px) {
+    .nf-forestwatch-page .nf-page-content {
+        padding: 18px 14px;
+    }
+
+    .nf-forestwatch-page .nf-heading-card {
+        width: 100%;
+    }
+}
+
 </style>

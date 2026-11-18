@@ -650,7 +650,11 @@ onBeforeUnmount(() => {
                     <article class="nf-summary-card">
                         <div class="nf-card-top">
                             <span class="nf-card-title">High Risk Provinces</span>
-                            <span class="nf-card-icon icon-fire">🔥</span>
+                            <span class="nf-card-icon nf-icon-orange">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </span>
                         </div>
                         <div class="nf-card-value">{{ summary.high_risk_zones ?? 0 }}</div>
                         <div class="nf-card-sub">Immediate mitigation priority (Prob &ge; 35%)</div>
@@ -659,7 +663,13 @@ onBeforeUnmount(() => {
                     <article class="nf-summary-card">
                         <div class="nf-card-top">
                             <span class="nf-card-title">Moderate Risk Provinces</span>
-                            <span class="nf-card-icon icon-warning">⚠️</span>
+                            <span class="nf-card-icon nf-icon-yellow">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="9" x2="12" y2="13" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </span>
                         </div>
                         <div class="nf-card-value">{{ summary.moderate_risk_zones ?? 0 }}</div>
                         <div class="nf-card-sub">Patrol alert status (Prob 15–34%)</div>
@@ -668,7 +678,13 @@ onBeforeUnmount(() => {
                     <article class="nf-summary-card">
                         <div class="nf-card-top">
                             <span class="nf-card-title">Avg. Fire Probability</span>
-                            <span class="nf-card-icon icon-chart">📊</span>
+                            <span class="nf-card-icon nf-icon-green">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <line x1="18" y1="20" x2="18" y2="10" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="20" x2="12" y2="4" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="6" y1="20" x2="6" y2="14" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </span>
                         </div>
                         <div class="nf-card-value">{{ summary.average_fire_probability_pct ?? 0 }}%</div>
                         <div class="nf-card-sub">National multi-source calibration</div>
@@ -677,7 +693,15 @@ onBeforeUnmount(() => {
                     <article class="nf-summary-card">
                         <div class="nf-card-top">
                             <span class="nf-card-title">Active FIRMS Hotspots</span>
-                            <span class="nf-card-icon icon-sat">🛰️</span>
+                            <span class="nf-card-icon nf-icon-blue">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="22" y1="12" x2="18" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="6" y1="12" x2="2" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="6" x2="12" y2="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="22" x2="12" y2="18" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </span>
                         </div>
                         <div class="nf-card-value">{{ summary.active_satellite_hotspots ?? 0 }}</div>
                         <div class="nf-card-sub">38 Monitored Provinces (VIIRS Live)</div>
@@ -993,11 +1017,17 @@ onBeforeUnmount(() => {
                                             </div>
                                         </td>
                                         <td>
-                                            <span v-if="(prov.firms_active_hotspots ?? 0) > 0" class="text-danger">
-                                                🔥 {{ prov.firms_active_hotspots }} (Max {{ prov.firms_max_frp ?? 0 }} MW)
+                                            <span v-if="(prov.firms_active_hotspots ?? 0) > 0" class="text-danger nf-hotspot-cell">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true">
+                                                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                                {{ prov.firms_active_hotspots }} (Max {{ prov.firms_max_frp ?? 0 }} MW)
                                             </span>
-                                            <span v-else class="text-safe">
-                                                ✓ 0 active
+                                            <span v-else class="text-safe nf-hotspot-cell">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13" aria-hidden="true">
+                                                    <polyline points="20 6 9 17 4 12" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                                0 active
                                             </span>
                                         </td>
                                         <td>
@@ -1029,28 +1059,49 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .nf-ai-page {
-    --page-bg: #f8fafc;
+    --page-bg: #f5f7f4;
     --surface-bg: #ffffff;
-    --text-main: #0f172a;
-    --text-muted: #64748b;
-    --border-color: #e2e8f0;
-    --primary: #15803d;
-    --primary-light: rgba(21, 128, 61, 0.08);
+    --text-main: #1c2922;
+    --text-muted: #526158;
+    --border-color: #e5eae4;
+    --primary: #2d8a5b;
+    --primary-light: rgba(45, 138, 91, 0.08);
+
+    --db-bg: #f5f7f4;
+    --db-surface: #fff;
+    --db-surface-soft: #f8faf7;
+    --db-text: #1c2922;
+    --db-text-soft: #526158;
+    --db-muted: #859087;
+    --db-border: #e5eae4;
+    --db-accent: #2d8a5b;
+    --db-accent-soft: #e8f5ec;
+
     display: flex;
     min-height: 100vh;
     background: var(--page-bg);
     color: var(--text-main);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .nf-ai-page.theme-dark {
-    --page-bg: #0b1319;
-    --surface-bg: #13222d;
-    --text-main: #f1f5f9;
-    --text-muted: #94a3b8;
-    --border-color: #1e3344;
-    --primary: #22c55e;
-    --primary-light: rgba(34, 197, 94, 0.12);
+    --page-bg: #111914;
+    --surface-bg: #19231c;
+    --text-main: #edf4ed;
+    --text-muted: #b0bdb2;
+    --border-color: #2b3a2e;
+    --primary: #70cf98;
+    --primary-light: rgba(112, 207, 152, 0.12);
+
+    --db-bg: #111914;
+    --db-surface: #19231c;
+    --db-surface-soft: #1d2921;
+    --db-text: #edf4ed;
+    --db-text-soft: #b0bdb2;
+    --db-muted: #849489;
+    --db-border: #2b3a2e;
+    --db-accent: #70cf98;
+    --db-accent-soft: #213b2b;
 }
 
 .nf-main {
@@ -1246,7 +1297,59 @@ onBeforeUnmount(() => {
 }
 
 .nf-card-icon {
-    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    flex-shrink: 0;
+}
+
+.nf-icon-orange {
+    color: #d27d42;
+    background: #fff0e3;
+}
+
+.nf-icon-yellow {
+    color: #c49a31;
+    background: #fff6d9;
+}
+
+.nf-icon-green {
+    color: #2f9860;
+    background: #e5f5e9;
+}
+
+.nf-icon-blue {
+    color: #508ec5;
+    background: #e7f3ff;
+}
+
+.theme-dark .nf-icon-orange {
+    color: #f97316;
+    background: rgba(249, 115, 22, 0.15);
+}
+
+.theme-dark .nf-icon-yellow {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+}
+
+.theme-dark .nf-icon-green {
+    color: #70cf98;
+    background: rgba(112, 207, 152, 0.15);
+}
+
+.theme-dark .nf-icon-blue {
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.15);
+}
+
+.nf-hotspot-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .nf-card-value {
@@ -1678,5 +1781,246 @@ onBeforeUnmount(() => {
     background: var(--primary);
     color: #ffffff;
     border-color: var(--primary);
+}
+
+
+/* NusaFire AI Prediction — visual polish only */
+.nf-ai-page {
+    position: relative;
+    isolation: isolate;
+    overflow-x: clip;
+    background:
+        radial-gradient(ellipse at 88% 8%, rgba(226, 185, 77, 0.12), transparent 27rem),
+        radial-gradient(ellipse at 18% 35%, rgba(45, 138, 91, 0.09), transparent 32rem),
+        var(--page-bg);
+}
+
+.nf-ai-page::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto auto;
+    width: min(44vw, 560px);
+    height: 380px;
+    pointer-events: none;
+    z-index: -1;
+    background: radial-gradient(ellipse, rgba(232, 190, 85, 0.11), transparent 68%);
+    filter: blur(18px);
+    animation: nfAiAmbientDrift 12s ease-in-out infinite alternate;
+}
+
+.nf-ai-page.theme-dark {
+    background:
+        radial-gradient(ellipse at 88% 8%, rgba(207, 166, 67, 0.09), transparent 27rem),
+        radial-gradient(ellipse at 18% 35%, rgba(54, 150, 91, 0.11), transparent 32rem),
+        var(--page-bg);
+}
+
+.nf-topbar {
+    backdrop-filter: blur(16px);
+    background: color-mix(in srgb, var(--surface-bg) 91%, transparent);
+    box-shadow: 0 1px 0 rgba(45, 138, 91, 0.05);
+}
+
+.nf-topbar::after {
+    content: "";
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(45, 138, 91, 0.28), rgba(220, 177, 68, 0.45), transparent);
+    pointer-events: none;
+}
+
+.nf-page-content {
+    position: relative;
+    animation: nfAiPageEnter 650ms cubic-bezier(.2,.7,.2,1) both;
+}
+
+.nf-page-heading {
+    position: relative;
+}
+
+.nf-heading-text h1 {
+    text-shadow: 0 3px 22px rgba(45, 138, 91, 0.08);
+}
+
+.nf-eyebrow-line {
+    box-shadow: 0 0 12px rgba(45, 138, 91, 0.35);
+}
+
+.nf-heading-card,
+.nf-panel,
+.nf-summary-card {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(24, 52, 35, 0.035);
+    transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+}
+
+.nf-heading-card::before,
+.nf-panel::before,
+.nf-summary-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 12%;
+    right: 12%;
+    height: 1px;
+    opacity: 0.75;
+    background: linear-gradient(90deg, transparent, rgba(219, 178, 72, 0.72), transparent);
+    pointer-events: none;
+}
+
+.nf-summary-card {
+    animation: nfAiCardEnter 650ms cubic-bezier(.2,.7,.2,1) both;
+}
+
+.nf-summary-card:nth-child(2) { animation-delay: 70ms; }
+.nf-summary-card:nth-child(3) { animation-delay: 140ms; }
+.nf-summary-card:nth-child(4) { animation-delay: 210ms; }
+.nf-summary-card:nth-child(5) { animation-delay: 280ms; }
+.nf-summary-card:nth-child(6) { animation-delay: 350ms; }
+
+.nf-summary-card:hover,
+.nf-heading-card:hover,
+.nf-panel:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--primary) 34%, var(--border-color));
+    box-shadow: 0 14px 32px rgba(24, 52, 35, 0.075), 0 0 0 1px rgba(45, 138, 91, 0.025);
+}
+
+.nf-card-icon {
+    transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+.nf-summary-card:hover .nf-card-icon {
+    transform: translateY(-2px) rotate(-3deg);
+    box-shadow: 0 5px 15px rgba(45, 138, 91, 0.12);
+}
+
+.nf-card-value {
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+}
+
+.nf-panel-header {
+    position: relative;
+}
+
+.nf-panel-eyebrow {
+    color: var(--primary);
+}
+
+.nf-control-field,
+.nf-search-box,
+.nf-select-control,
+.nf-select-btn,
+.nf-timeframe-btn,
+.nf-icon-button {
+    transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.nf-control-field:focus-within,
+.nf-search-box:focus,
+.nf-select-control:focus,
+.nf-search-box:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.nf-timeframe-btn:hover,
+.nf-select-btn:hover,
+.nf-icon-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(45, 138, 91, 0.1);
+}
+
+.nf-chart-wrap {
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(45, 138, 91, 0.035), transparent 55%);
+}
+
+.nf-chart-dot {
+    filter: drop-shadow(0 0 4px rgba(45, 138, 91, 0.28));
+}
+
+.nf-prob-progress,
+.nf-mini-bar {
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.045);
+}
+
+.nf-leaf-map {
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(45, 138, 91, 0.09);
+}
+
+.nf-table-scroll {
+    box-shadow: 0 5px 18px rgba(24, 52, 35, 0.025);
+}
+
+.nf-table tbody tr {
+    transition: background-color 160ms ease;
+}
+
+.nf-table tbody tr.is-selected {
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.nf-status-tag {
+    box-shadow: 0 0 0 3px rgba(45, 138, 91, 0.055);
+}
+
+.nf-ai-page.theme-dark .nf-heading-card,
+.nf-ai-page.theme-dark .nf-panel,
+.nf-ai-page.theme-dark .nf-summary-card {
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
+}
+
+.nf-ai-page.theme-dark .nf-summary-card:hover,
+.nf-ai-page.theme-dark .nf-heading-card:hover,
+.nf-ai-page.theme-dark .nf-panel:hover {
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22), 0 0 22px rgba(112, 207, 152, 0.045);
+}
+
+@keyframes nfAiAmbientDrift {
+    from { transform: translate3d(14px, -8px, 0) scale(0.96); opacity: 0.6; }
+    to { transform: translate3d(-28px, 18px, 0) scale(1.08); opacity: 1; }
+}
+
+@keyframes nfAiPageEnter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes nfAiCardEnter {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 700px) {
+    .nf-page-content { padding: 18px 14px; }
+    .nf-summary-card:hover,
+    .nf-heading-card:hover,
+    .nf-panel:hover { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nf-ai-page::before,
+    .nf-page-content,
+    .nf-summary-card {
+        animation: none !important;
+    }
+    .nf-summary-card,
+    .nf-heading-card,
+    .nf-panel,
+    .nf-card-icon,
+    .nf-timeframe-btn,
+    .nf-select-btn,
+    .nf-icon-button {
+        transition: none !important;
+    }
 }
 </style>

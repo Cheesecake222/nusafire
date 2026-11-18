@@ -748,13 +748,6 @@ onMounted(async () => {
                             <h2>Observation parameters</h2>
                             <p>Select province, display period, and land cover class, then click Apply Analysis.</p>
                         </div>
-                        <span class="filter-symbol">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" stroke-linecap="round">
-                                <line x1="4" y1="6" x2="20" y2="6"/>
-                                <line x1="4" y1="12" x2="20" y2="12"/>
-                                <line x1="4" y1="18" x2="20" y2="18"/>
-                            </svg>
-                        </span>
                     </div>
 
                     <form class="filter-grid" @submit.prevent="applyFilters">
@@ -1297,6 +1290,17 @@ onMounted(async () => {
     --green-dark: #1e7253;
     --green-soft: #eaf6ef;
     --shadow: 0 5px 22px rgba(31, 65, 48, .035);
+
+    --db-bg: #f5f7f6;
+    --db-surface: #fff;
+    --db-surface-soft: #f8faf7;
+    --db-text: #20352d;
+    --db-text-soft: #7c8c84;
+    --db-muted: #7c8c84;
+    --db-border: #e7ede9;
+    --db-accent: #278d68;
+    --db-accent-soft: #eaf6ef;
+
     min-height: 100vh;
     width: 100%;
     background: var(--page-bg);
@@ -1316,6 +1320,16 @@ onMounted(async () => {
     --green-dark: #6bd3a4;
     --green-soft: #203a2d;
     --shadow: 0 5px 22px rgba(0, 0, 0, .12);
+
+    --db-bg: #101a16;
+    --db-surface: #18251f;
+    --db-surface-soft: #1d2921;
+    --db-text: #e4eee8;
+    --db-text-soft: #94a89b;
+    --db-muted: #94a89b;
+    --db-border: #2b3b32;
+    --db-accent: #55c392;
+    --db-accent-soft: #203a2d;
 }
 
 .weather-main {
@@ -2707,6 +2721,489 @@ tbody tr:hover {
 
 .climate-ai-btn:hover {
     text-decoration: underline;
+}
+
+</style>
+
+
+<style>
+/* NusaFire Weather Analysis — visual polish only */
+.weather-page {
+    background:
+        radial-gradient(ellipse at 92% 2%, rgba(224, 183, 86, .10), transparent 26rem),
+        radial-gradient(ellipse at 12% 18%, rgba(39, 141, 104, .075), transparent 30rem),
+        var(--page-bg);
+}
+
+.weather-page.dark-mode {
+    background:
+        radial-gradient(ellipse at 92% 2%, rgba(210, 166, 64, .075), transparent 27rem),
+        radial-gradient(ellipse at 12% 18%, rgba(57, 170, 117, .08), transparent 30rem),
+        var(--page-bg);
+}
+
+.weather-page .topbar {
+    position: sticky;
+    isolation: isolate;
+    box-shadow: 0 5px 22px rgba(24, 64, 43, .035);
+}
+
+.weather-page .topbar::after {
+    content: "";
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(39, 141, 104, .34), rgba(215, 172, 73, .55), transparent);
+    pointer-events: none;
+}
+
+.weather-page .topbar-left h1 {
+    letter-spacing: -.035em;
+}
+
+.weather-page .page-heading {
+    animation: weather-rise-in .55s both ease-out;
+}
+
+.weather-page .eyebrow-line {
+    box-shadow: 0 0 12px rgba(215, 172, 73, .5);
+}
+
+.weather-page .heading-card,
+.weather-page .filter-card,
+.weather-page .location-bar,
+.weather-page .loading-card,
+.weather-page .climate-stat-card,
+.weather-page .climate-ai-bridge {
+    transition:
+        box-shadow .24s ease,
+        border-color .24s ease,
+        transform .24s ease,
+        background-color .24s ease;
+}
+
+.weather-page .heading-card,
+.weather-page .filter-card,
+.weather-page .location-bar {
+    box-shadow: 0 8px 28px rgba(26, 63, 43, .045);
+}
+
+.weather-page .heading-card:hover,
+.weather-page .filter-card:hover,
+.weather-page .location-bar:hover,
+.weather-page .climate-stat-card:hover {
+    border-color: rgba(39, 141, 104, .28);
+    box-shadow: 0 12px 32px rgba(26, 63, 43, .075), 0 0 0 1px rgba(215, 172, 73, .07);
+}
+
+.weather-page .heading-card-icon,
+.weather-page .filter-symbol,
+.weather-page .location-pin {
+    transition: transform .24s ease, box-shadow .24s ease;
+}
+
+.weather-page .heading-card:hover .heading-card-icon,
+.weather-page .filter-card:hover .filter-symbol,
+.weather-page .location-bar:hover .location-pin {
+    transform: translateY(-2px);
+}
+
+.weather-page .refresh-button,
+.weather-page .prediction-button,
+.weather-page .icon-button {
+    transition:
+        transform .2s ease,
+        box-shadow .2s ease,
+        background-color .2s ease,
+        border-color .2s ease,
+        opacity .2s ease;
+}
+
+.weather-page .refresh-button:hover:not(:disabled),
+.weather-page .prediction-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(39, 141, 104, .2), 0 0 0 1px rgba(215, 172, 73, .12);
+}
+
+.weather-page .icon-button:hover {
+    border-color: rgba(215, 172, 73, .55);
+    box-shadow: 0 0 0 3px rgba(215, 172, 73, .09);
+}
+
+.weather-page .field input:focus,
+.weather-page .field select:focus,
+.weather-page .field textarea:focus {
+    outline: none;
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(39, 141, 104, .12), 0 0 12px rgba(215, 172, 73, .07);
+}
+
+.weather-page .connection-dot.online {
+    box-shadow: 0 0 0 4px rgba(46, 174, 117, .10);
+    animation: weather-status-pulse 2.4s ease-in-out infinite;
+}
+
+.weather-page .section-heading {
+    letter-spacing: -.015em;
+}
+
+.weather-page .climate-ai-bridge {
+    box-shadow: inset 3px 0 0 rgba(215, 172, 73, .55);
+}
+
+.weather-page .climate-ai-btn {
+    transition: color .2s ease, gap .2s ease;
+}
+
+.weather-page .climate-ai-btn:hover {
+    color: var(--green-dark);
+    gap: 9px;
+}
+
+.weather-page tbody tr {
+    transition: background-color .18s ease;
+}
+
+.weather-page tbody tr:hover {
+    background: rgba(39, 141, 104, .055);
+}
+
+.weather-page .condition-badge {
+    box-shadow: inset 0 0 0 1px rgba(75, 110, 87, .045);
+}
+
+@keyframes weather-rise-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes weather-status-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(46, 174, 117, .08); }
+    50% { box-shadow: 0 0 0 5px rgba(46, 174, 117, .015); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .weather-page *,
+    .weather-page *::before,
+    .weather-page *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+    }
+}
+
+@media (max-width: 900px) {
+    .weather-page .page-content {
+        background-image: radial-gradient(ellipse at 100% 0%, rgba(215, 172, 73, .055), transparent 20rem);
+    }
+}
+
+/* NusaFire Weather Analysis — stronger visual atmosphere, presentation only */
+.weather-page {
+    position: relative;
+    isolation: isolate;
+    background:
+        radial-gradient(ellipse at 92% 1%, rgba(229, 184, 65, .17), transparent 28rem),
+        radial-gradient(ellipse at 5% 32%, rgba(39, 141, 104, .13), transparent 32rem),
+        var(--page-bg);
+}
+
+.weather-page::before,
+.weather-page::after {
+    content: "";
+    position: fixed;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: 50%;
+    filter: blur(5px);
+    will-change: transform, opacity;
+}
+
+.weather-page::before {
+    width: 390px;
+    height: 390px;
+    top: 8%;
+    right: -190px;
+    background: radial-gradient(circle, rgba(226, 180, 68, .16), rgba(226, 180, 68, 0) 70%);
+    animation: weather-ambient-float 13s ease-in-out infinite alternate;
+}
+
+.weather-page::after {
+    width: 460px;
+    height: 460px;
+    left: 8%;
+    bottom: -260px;
+    background: radial-gradient(circle, rgba(39, 141, 104, .11), rgba(39, 141, 104, 0) 70%);
+    animation: weather-ambient-float 16s ease-in-out infinite alternate-reverse;
+}
+
+.weather-page .weather-main {
+    position: relative;
+    z-index: 1;
+}
+
+.weather-page .topbar {
+    background: color-mix(in srgb, var(--card-bg) 91%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 7px 28px rgba(24, 64, 43, .055);
+}
+
+.weather-page .topbar::after {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(39, 141, 104, .65), rgba(230, 184, 68, .95), rgba(39, 141, 104, .42), transparent);
+    background-size: 200% 100%;
+    animation: weather-gold-line 8s linear infinite;
+}
+
+.weather-page .topbar-left h1 {
+    text-shadow: 0 2px 22px rgba(39, 141, 104, .10);
+}
+
+.weather-page .page-content {
+    position: relative;
+    background-image: radial-gradient(ellipse at 88% 0%, rgba(224, 183, 86, .065), transparent 23rem);
+}
+
+.weather-page .page-heading {
+    position: relative;
+    animation: weather-rise-in .62s cubic-bezier(.2, .7, .25, 1) both;
+}
+
+.weather-page .eyebrow {
+    color: var(--green);
+    text-shadow: 0 0 16px rgba(39, 141, 104, .12);
+}
+
+.weather-page .eyebrow-line {
+    width: 34px;
+    height: 2px;
+    background: linear-gradient(90deg, #d9ad3e, #2a966e);
+    box-shadow: 0 0 15px rgba(215, 172, 73, .62);
+}
+
+.weather-page .heading-card,
+.weather-page .filter-card,
+.weather-page .location-bar,
+.weather-page .panel,
+.weather-page .stat-card,
+.weather-page .climate-stat-card,
+.weather-page .climate-ai-bridge,
+.weather-page .loading-card {
+    position: relative;
+    isolation: isolate;
+    border-color: color-mix(in srgb, var(--border-color) 82%, #d9b34f 18%);
+    box-shadow: 0 9px 28px rgba(24, 64, 43, .055), 0 1px 0 rgba(255, 255, 255, .60) inset;
+    transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease;
+}
+
+.weather-page .heading-card::before,
+.weather-page .filter-card::before,
+.weather-page .location-bar::before,
+.weather-page .panel::before,
+.weather-page .stat-card::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    left: 18px;
+    right: 18px;
+    height: 1px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, rgba(218, 176, 65, .65), rgba(39, 141, 104, .42), transparent);
+    opacity: .78;
+    pointer-events: none;
+}
+
+.weather-page .heading-card:hover,
+.weather-page .filter-card:hover,
+.weather-page .location-bar:hover,
+.weather-page .panel:hover,
+.weather-page .stat-card:hover,
+.weather-page .climate-stat-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(39, 141, 104, .36);
+    box-shadow: 0 15px 34px rgba(24, 64, 43, .09), 0 0 0 1px rgba(218, 176, 65, .10);
+}
+
+.weather-page .heading-card-icon,
+.weather-page .filter-symbol,
+.weather-page .location-pin,
+.weather-page .stat-icon,
+.weather-page .panel-icon {
+    transition: transform .28s ease, box-shadow .28s ease, filter .28s ease;
+}
+
+.weather-page .heading-card:hover .heading-card-icon,
+.weather-page .filter-card:hover .filter-symbol,
+.weather-page .location-bar:hover .location-pin,
+.weather-page .stat-card:hover .stat-icon,
+.weather-page .panel:hover .panel-icon {
+    transform: translateY(-2px) scale(1.045);
+    filter: saturate(1.12);
+    box-shadow: 0 7px 19px rgba(39, 141, 104, .15);
+}
+
+.weather-page .stats-grid .stat-card {
+    animation: weather-rise-in .58s cubic-bezier(.2, .7, .25, 1) both;
+}
+.weather-page .stats-grid .stat-card:nth-child(2) { animation-delay: .07s; }
+.weather-page .stats-grid .stat-card:nth-child(3) { animation-delay: .14s; }
+.weather-page .stats-grid .stat-card:nth-child(4) { animation-delay: .21s; }
+
+.weather-page .stat-value {
+    letter-spacing: -.035em;
+    font-variant-numeric: tabular-nums;
+}
+
+.weather-page .stat-accent {
+    opacity: .95;
+    filter: drop-shadow(0 0 5px rgba(39, 141, 104, .13));
+}
+
+.weather-page .content-grid > .panel {
+    animation: weather-rise-in .64s cubic-bezier(.2, .7, .25, 1) both;
+}
+.weather-page .content-grid > .panel:nth-child(2) { animation-delay: .11s; }
+.weather-page .table-panel { animation: weather-rise-in .66s ease-out .18s both; }
+
+.weather-page .panel-header h2 {
+    letter-spacing: -.025em;
+}
+
+.weather-page .panel-eyebrow {
+    color: var(--green);
+    letter-spacing: .12em;
+}
+
+.weather-page .chart-wrap {
+    border-radius: 13px;
+    background: linear-gradient(180deg, rgba(39, 141, 104, .035), transparent 76%);
+}
+
+.weather-page .chart-grid-lines span {
+    border-color: rgba(120, 145, 128, .16);
+}
+
+.weather-page .metric-pill {
+    transition: transform .18s ease, color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.weather-page .metric-pill:hover { transform: translateY(-1px); }
+.weather-page .metric-pill.active {
+    box-shadow: 0 3px 10px rgba(39, 141, 104, .14), 0 0 0 1px rgba(218, 176, 65, .16);
+}
+
+.weather-page .risk-result {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 8px 22px rgba(24, 64, 43, .05);
+}
+.weather-page .risk-gauge {
+    filter: drop-shadow(0 0 8px rgba(39, 141, 104, .10));
+}
+.weather-page .probability-track {
+    background: color-mix(in srgb, var(--border-color) 72%, var(--card-bg));
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .05);
+}
+.weather-page .probability-fill {
+    box-shadow: 0 0 10px rgba(209, 139, 79, .25);
+}
+
+.weather-page .refresh-button,
+.weather-page .prediction-button,
+.weather-page .filter-submit-btn,
+.weather-page .icon-button {
+    transition: transform .2s ease, box-shadow .2s ease, filter .2s ease, border-color .2s ease;
+}
+.weather-page .refresh-button:hover:not(:disabled),
+.weather-page .prediction-button:hover:not(:disabled),
+.weather-page .filter-submit-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(39, 141, 104, .20), 0 0 0 3px rgba(218, 176, 65, .09);
+    filter: saturate(1.08);
+}
+.weather-page .icon-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 3px rgba(218, 176, 65, .11);
+}
+
+.weather-page .connection-dot.online {
+    box-shadow: 0 0 0 4px rgba(46, 174, 117, .10), 0 0 13px rgba(46, 174, 117, .35);
+    animation: weather-status-pulse 2.3s ease-in-out infinite;
+}
+
+.weather-page .location-pin {
+    filter: drop-shadow(0 0 8px rgba(39, 141, 104, .18));
+}
+
+.weather-page .table-panel {
+    overflow: hidden;
+}
+.weather-page thead {
+    background: linear-gradient(90deg, rgba(39, 141, 104, .075), rgba(218, 176, 65, .065));
+}
+.weather-page tbody tr {
+    transition: background-color .2s ease;
+}
+.weather-page tbody tr:hover {
+    background: rgba(39, 141, 104, .065);
+}
+.weather-page .condition-badge {
+    box-shadow: inset 0 0 0 1px rgba(75, 110, 87, .06);
+}
+.weather-page .page-footer {
+    border-top: 1px solid color-mix(in srgb, var(--border-color) 75%, #d9b34f 25%);
+}
+
+.weather-page.dark-mode {
+    background:
+        radial-gradient(ellipse at 92% 1%, rgba(226, 180, 68, .11), transparent 29rem),
+        radial-gradient(ellipse at 5% 32%, rgba(39, 141, 104, .12), transparent 32rem),
+        var(--page-bg);
+}
+.weather-page.dark-mode .heading-card,
+.weather-page.dark-mode .filter-card,
+.weather-page.dark-mode .location-bar,
+.weather-page.dark-mode .panel,
+.weather-page.dark-mode .stat-card,
+.weather-page.dark-mode .climate-stat-card,
+.weather-page.dark-mode .climate-ai-bridge,
+.weather-page.dark-mode .loading-card {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .12), 0 1px 0 rgba(255, 255, 255, .025) inset;
+}
+.weather-page.dark-mode .heading-card:hover,
+.weather-page.dark-mode .filter-card:hover,
+.weather-page.dark-mode .location-bar:hover,
+.weather-page.dark-mode .panel:hover,
+.weather-page.dark-mode .stat-card:hover,
+.weather-page.dark-mode .climate-stat-card:hover {
+    box-shadow: 0 15px 34px rgba(0, 0, 0, .20), 0 0 0 1px rgba(218, 176, 65, .12);
+}
+.weather-page.dark-mode .chart-wrap {
+    background: linear-gradient(180deg, rgba(39, 141, 104, .075), transparent 76%);
+}
+
+@keyframes weather-ambient-float {
+    from { transform: translate3d(0, 0, 0) scale(1); opacity: .72; }
+    to { transform: translate3d(-24px, 20px, 0) scale(1.08); opacity: 1; }
+}
+@keyframes weather-gold-line {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+}
+
+@media (max-width: 900px) {
+    .weather-page::before { right: -250px; width: 320px; height: 320px; }
+    .weather-page::after { left: -170px; width: 320px; height: 320px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .weather-page::before,
+    .weather-page::after,
+    .weather-page .topbar::after {
+        animation: none !important;
+    }
 }
 
 </style>
