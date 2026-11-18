@@ -3,45 +3,44 @@ import { ref } from 'vue';
 
 export type Theme = 'dark' | 'light';
 
-// Baca tema awal dari <html> yang sudah diset oleh inline script di <head>.
-// Ini memastikan state Vue langsung sinkron dengan DOM sejak render pertama,
-// sehingga tidak ada flash/perubahan tampilan saat halaman dimuat.
+// Baca tema awal dari localStorage atau <html>. Default: 'light' (mode terang)
 function getInitialTheme(): Theme {
-    if (typeof document !== 'undefined') {
-        if (document.documentElement.classList.contains('theme-light')) return 'light';
-        if (document.documentElement.classList.contains('theme-dark')) return 'dark';
-    }
-    // Fallback: cek localStorage langsung
     if (typeof localStorage !== 'undefined') {
-        const saved = localStorage.getItem('nusafire-theme');
-        if (saved === 'light' || saved === 'dark') return saved;
+        const saved = localStorage.getItem('nusafire-theme') || localStorage.getItem('appearance');
+        if (saved === 'dark') return 'dark';
+        if (saved === 'light') return 'light';
     }
-    return 'dark';
+    if (typeof document !== 'undefined') {
+        if (document.documentElement.classList.contains('theme-dark') || document.documentElement.classList.contains('dark')) {
+            return 'dark';
+        }
+    }
+    return 'light';
 }
 
-// Satu state yang dipakai bersama oleh seluruh halaman Vue.
+// Satu state reaktif yang dipakai bersama oleh seluruh halaman Vue.
 const theme = ref<Theme>(getInitialTheme());
 
 function applyTheme(value: Theme, save = true) {
     theme.value = value;
 
     if (typeof document !== 'undefined') {
-        // Update class di <html> (dipakai oleh script head dan CSS global)
-        document.documentElement.classList.remove('theme-dark', 'theme-light');
+        document.documentElement.classList.remove('theme-dark', 'theme-light', 'dark');
         document.documentElement.classList.add('theme-' + value);
+        if (value === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
         document.documentElement.dataset.theme = value;
         document.documentElement.style.colorScheme = value;
     }
 
     if (save && typeof localStorage !== 'undefined') {
         localStorage.setItem('nusafire-theme', value);
+        localStorage.setItem('appearance', value);
     }
 }
 
-function initializeTheme() {
-    // State sudah diinisialisasi dari getInitialTheme() di atas.
-    // Fungsi ini hanya memastikan atribut DOM sinkron (untuk pages yang
-    // belum pernah render applyTheme).
+export function initializeTheme() {
     applyTheme(theme.value, false);
 }
 

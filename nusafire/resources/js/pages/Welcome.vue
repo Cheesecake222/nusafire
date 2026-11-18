@@ -10,33 +10,23 @@ const { theme, toggleTheme } = useTheme();
 </script>
 
 <template>
-    <Head title="NusaFire — Forest Intelligence" />
+    <Head title="NusaFire — Fire Early Warning & Environmental Intelligence" />
 
     <main class="landing-page" :class="`theme-${theme}`">
         <!-- NAVIGATION -->
         <header class="navbar">
             <a href="#home" class="brand">
                 <span class="brand-icon">
-                    <svg viewBox="0 0 40 44" fill="none">
-                        <path
-                            d="M20 2L36 11V31L20 41L4 31V11L20 2Z"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <path
-                            d="M21 7C21 15 12 18 13 25C13 30 17 33 21 33C27 33 30 28 28 23C27 19 23 15 21 7Z"
-                            fill="#F6A623"
-                        />
-                        <path
-                            d="M19 20C16 24 17 29 21 30C24 27 23 24 19 20Z"
-                            fill="#FFD166"
-                        />
-                    </svg>
+                    <img
+                        src="/logo.png"
+                        alt="NusaFire Logo"
+                        class="brand-logo-img"
+                    />
                 </span>
 
                 <span class="brand-copy">
                     <strong>NusaFire</strong>
-                    <small>FOREST INTELLIGENCE</small>
+                    <small>FIRE EARLY WARNING</small>
                 </span>
             </a>
 
@@ -82,7 +72,10 @@ const { theme, toggleTheme } = useTheme();
 
                 <Link href="/dashboard" class="nav-cta">
                     Explore Dashboard
-                    <span aria-hidden="true">↗</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="7" y1="17" x2="17" y2="7" />
+                        <polyline points="7 7 17 7 17 17" />
+                    </svg>
                 </Link>
             </div>
         </header>
@@ -92,7 +85,7 @@ const { theme, toggleTheme } = useTheme();
             <div class="hero-copy">
                 <div class="eyebrow">
                     <span class="status-dot"></span>
-                    ENVIRONMENTAL INTELLIGENCE PLATFORM
+                    AI &amp; SATELLITE EARLY WARNING SYSTEM
                 </div>
 
                 <h1>
@@ -101,15 +94,16 @@ const { theme, toggleTheme } = useTheme();
                 </h1>
 
                 <p class="hero-description">
-                    Understanding wildfires starts with understanding data.
-                    NusaFire brings hotspot observations, weather conditions,
-                    and fire analysis together in one place.
+                    Environmental intelligence platform powered by active NASA FIRMS VIIRS (375m) satellites, Open-Meteo real-time meteorology, and XGBoost machine learning for wildfire risk prediction across 38 Indonesian provinces.
                 </p>
 
                 <div class="hero-actions">
                     <Link href="/dashboard" class="button-primary">
                         Explore NusaFire
-                        <span aria-hidden="true">→</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                        </svg>
                     </Link>
 
                     <a href="#capabilities" class="button-secondary">
@@ -119,7 +113,7 @@ const { theme, toggleTheme } = useTheme();
 
                 <div class="hero-footnote">
                     <span class="footnote-line"></span>
-                    DATA-DRIVEN INSIGHTS FOR A FIRE-AWARE FUTURE
+                    INTEGRATED SATELLITE &amp; AI INTELLIGENCE FOR TARGETED WILDFIRE MITIGATION
                 </div>
             </div>
 
@@ -128,13 +122,13 @@ const { theme, toggleTheme } = useTheme();
                 <article class="preview-card">
                     <div class="preview-header">
                         <div>
-                            <span class="mini-label">MONITORING OVERVIEW</span>
+                            <span class="mini-label">NATIONAL MONITORING (38 PROVINCES)</span>
                             <h2>Indonesia Fire Watch</h2>
                         </div>
 
                         <span class="preview-badge">
                             <span></span>
-                            PREVIEW
+                            LIVE AI &amp; SATELLITE
                         </span>
                     </div>
 
@@ -221,28 +215,38 @@ const { theme, toggleTheme } = useTheme();
 
                         <div class="map-legend">
                             <span></span>
-                            Hotspot preview
+                            Active Satellite Hotspots
                         </div>
 
                         <span class="map-disclaimer">
-                            ILLUSTRATIVE MAP · NOT LIVE DATA
+                            REGIONAL PREVIEW · NASA FIRMS &amp; AI
                         </span>
                     </div>
 
                     <div class="preview-footer">
                         <div class="preview-metric">
-                            <span class="metric-icon coverage-icon">☆</span>
+                            <span class="metric-icon coverage-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="2" y1="12" x2="22" y2="12" />
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                </svg>
+                            </span>
                             <div>
                                 <span class="mini-label">DATA COVERAGE</span>
-                                <strong>Indonesia</strong>
+                                <strong>38 Indonesian Provinces</strong>
                             </div>
                         </div>
 
                         <div class="preview-metric">
-                            <span class="metric-icon fire-icon">♨</span>
+                            <span class="metric-icon fire-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+                                </svg>
+                            </span>
                             <div>
-                                <span class="mini-label">OBSERVATION</span>
-                                <strong>Hotspot signals</strong>
+                                <span class="mini-label">DETECTION SENSOR</span>
+                                <strong>NASA FIRMS VIIRS (375m)</strong>
                             </div>
                         </div>
                     </div>
@@ -251,8 +255,8 @@ const { theme, toggleTheme } = useTheme();
                 <div class="floating-note">
                     <span class="floating-indicator"></span>
                     <div>
-                        <span class="mini-label">BUILT FOR</span>
-                        <strong>Environmental Awareness</strong>
+                        <span class="mini-label">SYSTEM STATUS</span>
+                        <strong>XGBoost AI Model Active</strong>
                     </div>
                 </div>
             </div>
@@ -260,10 +264,13 @@ const { theme, toggleTheme } = useTheme();
 
         <!-- SECTION DIVIDER -->
         <div class="section-marker section-container">
-            <span>01 / INTRODUCTION</span>
+            <span>01 / ABOUT PLATFORM</span>
             <a href="#about">
                 SCROLL TO EXPLORE
-                <span aria-hidden="true">↓</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <polyline points="19 12 12 19 5 12" />
+                </svg>
             </a>
         </div>
 
@@ -271,53 +278,65 @@ const { theme, toggleTheme } = useTheme();
         <section id="about" class="content-section section-container">
             <div class="section-heading">
                 <span class="eyebrow">01 — ABOUT NUSAFIRE</span>
-                <h2>Turning environmental data into <span>clearer insights.</span></h2>
+                <h2>Turning spatial data &amp; weather into <span>targeted mitigation decisions.</span></h2>
             </div>
 
             <p class="section-description">
-                Wildfire monitoring involves more than identifying a hotspot.
-                Weather conditions, spatial patterns, and historical fire
-                activity can help provide context for understanding fire risk.
-                NusaFire is designed to bring these perspectives together in
-                an accessible interface.
+                Wildfire mitigation requires faster, more comprehensive intelligence than reactive firefighting. NusaFire combines 375-meter resolution NASA FIRMS VIIRS thermal satellite feeds, real-time Open-Meteo weather telemetry, and predictive XGBoost machine learning to forecast daily hotspot probabilities across 38 Indonesian provinces, evaluate risk levels, and support coordinated preventive patrols.
             </p>
         </section>
 
         <!-- CAPABILITIES -->
         <section id="capabilities" class="content-section section-container">
             <div class="section-heading">
-                <span class="eyebrow">02 — CAPABILITIES</span>
-                <h2>Explore the signals behind <span>wildfire activity.</span></h2>
+                <span class="eyebrow">02 — CAPABILITIES &amp; FEATURES</span>
+                <h2>Three integrated pillars for <span>monitoring &amp; early warning.</span></h2>
             </div>
 
             <div class="capability-grid">
                 <article class="capability-card">
-                    <div class="capability-icon">⌖</div>
-                    <span class="mini-label">01 / SPATIAL DATA</span>
-                    <h3>Hotspot Monitoring</h3>
+                    <div class="capability-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                        </svg>
+                    </div>
+                    <span class="mini-label">01 / AI RISK PREDICTION</span>
+                    <h3>Forest Fire Risk Prediction</h3>
                     <p>
-                        Explore the geographic distribution of detected
-                        hotspots and observe their spatial patterns.
+                        Trained XGBoost machine learning model calculates daily wildfire probabilities across 38 provinces, 7-day risk trend forecasts, and provincial mitigation priority rankings.
                     </p>
                 </article>
 
                 <article class="capability-card">
-                    <div class="capability-icon">☼</div>
-                    <span class="mini-label">02 / WEATHER CONTEXT</span>
-                    <h3>Weather Analysis</h3>
+                    <div class="capability-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="22" y1="12" x2="18" y2="12" />
+                            <line x1="6" y1="12" x2="2" y2="12" />
+                            <line x1="12" y1="6" x2="12" y2="2" />
+                            <line x1="12" y1="22" x2="12" y2="18" />
+                        </svg>
+                    </div>
+                    <span class="mini-label">02 / SATELLITE GEOSPATIAL</span>
+                    <h3>Interactive Hotspot Map</h3>
                     <p>
-                        Examine environmental conditions such as temperature,
-                        precipitation, and relative humidity.
+                        Interactive Leaflet GIS mapping featuring live NASA FIRMS VIIRS (375m) feeds, Fire Radiative Power (FRP) metrics, confidence levels, region filtering, and CSV export.
                     </p>
                 </article>
 
                 <article class="capability-card">
-                    <div class="capability-icon">▥</div>
-                    <span class="mini-label">03 / FIRE HISTORY</span>
-                    <h3>Burned Area Insights</h3>
+                    <div class="capability-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+                        </svg>
+                    </div>
+                    <span class="mini-label">03 / REAL-TIME METEOROLOGY</span>
+                    <h3>Weather &amp; Land Cover Analysis</h3>
                     <p>
-                        Explore historical burned-area information to
-                        understand fire activity over time.
+                        Real-time meteorological monitoring (temperature, humidity, precipitation, wind speed) from Open-Meteo, with AI simulation on land cover sensitivity.
                     </p>
                 </article>
             </div>
@@ -326,18 +345,17 @@ const { theme, toggleTheme } = useTheme();
         <!-- HOW IT WORKS -->
         <section id="how-it-works" class="content-section section-container">
             <div class="section-heading">
-                <span class="eyebrow">03 — HOW IT WORKS</span>
-                <h2>From raw data to <span>meaningful context.</span></h2>
+                <span class="eyebrow">03 — SYSTEM WORKFLOW</span>
+                <h2>From multi-source data fusion to <span>actionable early warnings.</span></h2>
             </div>
 
             <div class="process-list">
                 <article class="process-item">
                     <span class="process-number">01</span>
                     <div>
-                        <h3>Collect environmental data</h3>
+                        <h3>Acquire Satellite &amp; Weather Data</h3>
                         <p>
-                            Gather hotspot observations, weather information,
-                            and relevant spatial datasets from their sources.
+                            Continuous ingestion of thermal anomaly detections from NASA FIRMS VIIRS (375m) and daily meteorological telemetry from Open-Meteo across 38 provinces.
                         </p>
                     </div>
                 </article>
@@ -345,10 +363,9 @@ const { theme, toggleTheme } = useTheme();
                 <article class="process-item">
                     <span class="process-number">02</span>
                     <div>
-                        <h3>Process and analyze</h3>
+                        <h3>Data Fusion &amp; XGBoost AI Modeling</h3>
                         <p>
-                            Organize the datasets into a consistent format
-                            for spatial exploration and temporal analysis.
+                            Synthesizing atmospheric variables, satellite FRP readings, and land cover classifications through calibrated machine learning algorithms to compute fire probabilities.
                         </p>
                     </div>
                 </article>
@@ -356,10 +373,9 @@ const { theme, toggleTheme } = useTheme();
                 <article class="process-item">
                     <span class="process-number">03</span>
                     <div>
-                        <h3>Explore the results</h3>
+                        <h3>Visualization &amp; Mitigation Decisions</h3>
                         <p>
-                            Use maps, charts, and summaries to explore
-                            patterns and support environmental awareness.
+                            Delivering insights via an interactive dashboard, geospatial hotspot mapping, and categorized risk status (High / Moderate Risk) to guide field patrols.
                         </p>
                     </div>
                 </article>
@@ -368,16 +384,18 @@ const { theme, toggleTheme } = useTheme();
             <div class="final-cta">
                 <div>
                     <span class="eyebrow">READY TO EXPLORE?</span>
-                    <h2>See the bigger picture.</h2>
+                    <h2>Start exploring the NusaFire platform today.</h2>
                     <p>
-                        Explore the NusaFire dashboard and its analytical
-                        interface.
+                        Access AI early warning predictions, monitor active satellite hotspots, and analyze real-time weather conditions across Indonesia.
                     </p>
                 </div>
 
                 <Link href="/dashboard" class="button-primary">
                     Explore Dashboard
-                    <span aria-hidden="true">→</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                    </svg>
                 </Link>
             </div>
         </section>
@@ -386,27 +404,21 @@ const { theme, toggleTheme } = useTheme();
         <footer class="footer section-container">
             <a href="#home" class="brand footer-brand">
                 <span class="brand-icon">
-                    <svg viewBox="0 0 40 44" fill="none">
-                        <path
-                            d="M20 2L36 11V31L20 41L4 31V11L20 2Z"
-                            stroke="currentColor"
-                            stroke-width="2"
-                        />
-                        <path
-                            d="M21 7C21 15 12 18 13 25C13 30 17 33 21 33C27 33 30 28 28 23C27 19 23 15 21 7Z"
-                            fill="#F6A623"
-                        />
-                    </svg>
+                    <img
+                        src="/logo.png"
+                        alt="NusaFire Logo"
+                        class="brand-logo-img"
+                    />
                 </span>
                 <span class="brand-copy">
                     <strong>NusaFire</strong>
-                    <small>FOREST INTELLIGENCE</small>
+                    <small>FIRE EARLY WARNING</small>
                 </span>
             </a>
 
-            <p>Environmental data. Clearer perspectives.</p>
+            <p>Indonesia Wildfire Intelligence &amp; Early Warning System Powered by Satellite &amp; AI.</p>
 
-            <span class="footer-copy">© 2026 NUSAFIRE</span>
+            <span class="footer-copy">© 2026 NUSAFIRE · INDONESIA FIRE INTELLIGENCE</span>
         </footer>
     </main>
 </template>
@@ -417,24 +429,6 @@ const { theme, toggleTheme } = useTheme();
    ========================================= */
 
 :root {
-    color-scheme: dark;
-    --nf-bg: #07120e;
-    --nf-surface: #0b1913;
-    --nf-surface-raised: #10231a;
-    --nf-text: #f1f6f1;
-    --nf-muted: #aabbb0;
-    --nf-subtle: #71877a;
-    --nf-border: #203b2d;
-    --nf-accent: #82d8a5;
-    --nf-accent-hover: #a0e8bb;
-    --nf-accent-text: #07150d;
-    --nf-grid: rgba(126, 199, 151, 0.055);
-    --nf-map: #24563f;
-    --nf-map-stroke: #65a985;
-    --nf-shadow: rgba(0, 0, 0, 0.18);
-}
-
-:root[data-theme='light'] {
     color-scheme: light;
     --nf-bg: #f3f6ef;
     --nf-surface: #fbfcf8;
@@ -450,6 +444,47 @@ const { theme, toggleTheme } = useTheme();
     --nf-map: #c6e0ca;
     --nf-map-stroke: #5c9870;
     --nf-shadow: rgba(38, 66, 44, 0.08);
+}
+
+:root[data-theme='light'],
+:root.theme-light,
+.landing-page.theme-light {
+    color-scheme: light;
+    --nf-bg: #f3f6ef;
+    --nf-surface: #fbfcf8;
+    --nf-surface-raised: #e8f0e5;
+    --nf-text: #152d20;
+    --nf-muted: #52695a;
+    --nf-subtle: #718779;
+    --nf-border: #d0dfd0;
+    --nf-accent: #28784c;
+    --nf-accent-hover: #1f643e;
+    --nf-accent-text: #ffffff;
+    --nf-grid: rgba(47, 112, 70, 0.07);
+    --nf-map: #c6e0ca;
+    --nf-map-stroke: #5c9870;
+    --nf-shadow: rgba(38, 66, 44, 0.08);
+}
+
+:root[data-theme='dark'],
+:root.theme-dark,
+:root.dark,
+.landing-page.theme-dark {
+    color-scheme: dark;
+    --nf-bg: #07120e;
+    --nf-surface: #0b1913;
+    --nf-surface-raised: #10231a;
+    --nf-text: #f1f6f1;
+    --nf-muted: #aabbb0;
+    --nf-subtle: #71877a;
+    --nf-border: #203b2d;
+    --nf-accent: #82d8a5;
+    --nf-accent-hover: #a0e8bb;
+    --nf-accent-text: #07150d;
+    --nf-grid: rgba(126, 199, 151, 0.055);
+    --nf-map: #24563f;
+    --nf-map-stroke: #65a985;
+    --nf-shadow: rgba(0, 0, 0, 0.18);
 }
 
 html {
@@ -518,15 +553,18 @@ a:focus-visible {
 }
 
 .brand-icon {
-    width: 42px;
+    width: 46px;
     height: 46px;
     display: inline-flex;
-    color: var(--nf-accent);
+    align-items: center;
+    justify-content: center;
 }
 
-.brand-icon svg {
+.brand-logo-img {
     width: 100%;
     height: 100%;
+    object-fit: contain;
+    display: block;
 }
 
 .brand-copy {
@@ -627,10 +665,10 @@ a:focus-visible {
     color: var(--nf-accent);
 }
 
-.nav-cta span,
-.button-primary span {
-    font-size: 21px;
-    line-height: 1;
+.nav-cta svg,
+.button-primary svg {
+    flex-shrink: 0;
+    display: block;
 }
 
 /* HERO */
@@ -908,10 +946,16 @@ a:focus-visible {
     width: 36px;
     height: 36px;
     flex: 0 0 auto;
-    display: grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 4px;
-    font-size: 22px;
+    line-height: 0;
+}
+
+.metric-icon svg {
+    display: block;
+    margin: auto;
 }
 
 .coverage-icon {
@@ -1045,12 +1089,18 @@ a:focus-visible {
     width: 46px;
     height: 46px;
     margin-bottom: 30px;
-    display: grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 5px;
     background: var(--nf-surface-raised);
     color: var(--nf-accent);
-    font-size: 27px;
+    line-height: 0;
+}
+
+.capability-icon svg {
+    display: block;
+    margin: auto;
 }
 
 .capability-card h3,

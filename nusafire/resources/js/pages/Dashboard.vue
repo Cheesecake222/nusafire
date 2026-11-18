@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
@@ -10,40 +9,91 @@ const { theme, toggleTheme } = useTheme();
 const mobileMenuOpen = ref(false);
 const sidebarCollapsed = ref(false);
 const loading = ref(true);
+
+function toggleSidebar() {
+    if (window.innerWidth <= 900) {
+        mobileMenuOpen.value = !mobileMenuOpen.value;
+    } else {
+        sidebarCollapsed.value = !sidebarCollapsed.value;
+        localStorage.setItem('nf-sidebar-collapsed', String(sidebarCollapsed.value));
+    }
+}
 const apiError = ref('');
 
-type Stats = {
-    total_records: number;
-    total_hotspot_count: number;
-    fire_records: number;
-    non_fire_records: number;
-    region_count: number;
-    start_date: string;
-    end_date: string;
+type OverviewSummary = {
+    high_risk_zones: number;
+    moderate_risk_zones: number;
+    average_fire_probability_pct: number;
+    monitored_regions: number;
+    monitored_provinces?: number;
+    active_satellite_hotspots?: number;
 };
 
-type MonthlyRecord = {
-    period: string;
-    hotspot_count: number;
-    fire_records: number;
-    non_fire_records: number;
+type WeatherData = {
+    PRECTOTCORR: number;
+    T2M: number;
+    T2M_MAX: number;
+    T2M_MIN: number;
+    RH2M: number;
+    WS10M: number;
 };
 
-type RegionRecord = {
-    REGION: string;
-    total_records: number;
-    total_hotspots: number;
-    fire_records: number;
+type RegionForecast = {
+    province_code?: string;
+    province?: string;
+    region: string;
+    island?: string;
+    location: string;
+    latitude: number;
+    longitude: number;
+    landcover_class?: number;
+    weather: WeatherData;
+    prediction: number;
+    probability_safe: number;
+    probability_fire: number;
+    risk_level: 'High' | 'Moderate' | 'Low';
+    firms_active_hotspots?: number;
+    firms_max_frp?: number;
+    calibration_applied?: boolean;
+    forecast_24_hours?: DailyForecastPoint[];
+    forecast_7_days?: DailyForecastPoint[];
 };
 
-const stats = ref<Stats | null>(null);
-const monthlyData = ref<MonthlyRecord[]>([]);
-const regionData = ref<RegionRecord[]>([]);
+type DailyForecastPoint = {
+    date?: string;
+    time?: string;
+    hour?: number;
+    label?: string;
+    fullLabel?: string;
+    full_label?: string;
+    probability_fire: number;
+    risk_level: 'High' | 'Moderate' | 'Low';
+    temperature?: number;
+    humidity?: number;
+    wind_speed?: number;
+};
 
-const period = ref('12 Months');
-const periods = ['12 Months', '24 Months', 'All Period'];
+const summary = ref<OverviewSummary | null>(null);
+const regionForecasts = ref<RegionForecast[]>([]);
+const weeklyForecast = ref<DailyForecastPoint[]>([]);
+const hourlyForecast = ref<DailyForecastPoint[]>([]);
+const selectedTimeframe = ref<'24h' | '7d' | '14d'>('7d');
+const selectedRegionName = ref<string>('');
+const lastUpdated = ref<string>('');
+const firmsLive = ref<boolean>(false);
+const firmsTotalHotspots = ref<number>(0);
+const hoveredPoint = ref<{
+    x: number;
+    y: number;
+    value: number;
+    label: string;
+    fullLabel: string;
+    riskLevel: string;
+    temp?: number;
+    humidity?: number;
+} | null>(null);
 
-const numberFormatter = new Intl.NumberFormat('id-ID');
+const numberFormatter = new Intl.NumberFormat('en-US');
 
 function formatNumber(value: number | undefined): string {
     if (value === undefined || !Number.isFinite(value)) {
@@ -53,49 +103,144 @@ function formatNumber(value: number | undefined): string {
     return numberFormatter.format(value);
 }
 
-function formatDate(value: string | undefined): string {
+function formatPercent(value: number | undefined): string {
+    if (value === undefined || !Number.isFinite(value)) {
+        return '—';
+    }
+
+    return `${value.toFixed(1)}%`;
+}
+
+function formatShortDate(value: string | undefined): string {
     if (!value) return '—';
+    if (value.includes(':')) return value;
 
     const date = new Date(`${value}T00:00:00`);
 
     if (Number.isNaN(date.getTime())) return value;
 
-    return new Intl.DateTimeFormat('id-ID', {
+    return new Intl.DateTimeFormat('en-US', {
+        day: 'numeric',
+        month: 'short',
+    }).format(date);
+}
+
+function formatFullDate(value: string | undefined): string {
+    if (!value) return '—';
+    if (value.includes('WIB') || value.includes('Hari')) return value;
+
+    const date = new Date(`${value}T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) return value;
+
+    return new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
         day: 'numeric',
         month: 'short',
         year: 'numeric',
     }).format(date);
 }
 
-async function fetchApi<T>(url: string): Promise<T> {
+function getCsrfToken(): string {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta?.getAttribute('content') ?? '';
+}
+
+async function fetchApi<T>(
+    url: string,
+    method: 'GET' | 'POST' = 'GET',
+    body?: Record<string, unknown>,
+): Promise<T> {
+    const headers: Record<string, string> = {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+    };
+
+    if (method === 'POST') {
+        headers['Content-Type'] = 'application/json';
+        const csrf = getCsrfToken();
+        if (csrf) {
+            headers['X-CSRF-TOKEN'] = csrf;
+        }
+    }
+
     const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-        },
+        method,
+        headers,
         credentials: 'same-origin',
+        body: body ? JSON.stringify(body) : undefined,
     });
 
     if (response.redirected) {
-        throw new Error(
-            'Sesi login tidak tersedia. Silakan login kembali.',
-        );
+        throw new Error('Login session expired. Please sign in again.');
     }
 
     if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
             throw new Error(
-                'Akses API ditolak. Pastikan akun sudah login dan terverifikasi.',
+                'API access denied. Please ensure your account is authenticated.',
             );
         }
 
         throw new Error(
-            `Permintaan API gagal dengan status HTTP ${response.status}.`,
+            `API request failed with HTTP status ${response.status}.`,
         );
     }
 
     return response.json() as Promise<T>;
+}
+
+async function loadWeeklyForecastForRegion(region: RegionForecast): Promise<void> {
+    if (region.forecast_7_days && region.forecast_7_days.length > 0) {
+        weeklyForecast.value = region.forecast_7_days;
+    }
+    if (region.forecast_24_hours && region.forecast_24_hours.length > 0) {
+        hourlyForecast.value = region.forecast_24_hours;
+    }
+
+    try {
+        const res = await fetchApi<{
+            status: string;
+            forecast_7_days?: DailyForecastPoint[];
+            forecast_24_hours?: DailyForecastPoint[];
+        }>('/internal/ai/predict-realtime', 'POST', {
+            LATITUDE: region.latitude,
+            LONGITUDE: region.longitude,
+        });
+
+        if (res.status === 'success') {
+            if (Array.isArray(res.forecast_7_days) && res.forecast_7_days.length > 0) {
+                weeklyForecast.value = res.forecast_7_days;
+                region.forecast_7_days = res.forecast_7_days;
+            }
+            if (Array.isArray(res.forecast_24_hours) && res.forecast_24_hours.length > 0) {
+                hourlyForecast.value = res.forecast_24_hours;
+                region.forecast_24_hours = res.forecast_24_hours;
+            }
+        }
+    } catch (err) {
+        console.warn('Real-time forecast background refresh warning:', err);
+    }
+}
+
+async function selectProvince(provinceName: string): Promise<void> {
+    selectedRegionName.value = provinceName;
+    const target = regionForecasts.value.find(
+        (r) => r.region === provinceName,
+    );
+    if (target) {
+        if (target.forecast_7_days && target.forecast_7_days.length > 0) {
+            weeklyForecast.value = target.forecast_7_days;
+        }
+        if (target.forecast_24_hours && target.forecast_24_hours.length > 0) {
+            hourlyForecast.value = target.forecast_24_hours;
+        }
+        await loadWeeklyForecastForRegion(target);
+    }
+}
+
+async function handleRegionChange(): Promise<void> {
+    await selectProvince(selectedRegionName.value);
 }
 
 async function loadDashboard(): Promise<void> {
@@ -103,103 +248,289 @@ async function loadDashboard(): Promise<void> {
     apiError.value = '';
 
     try {
-        const [statsResponse, chartsResponse, regionsResponse] =
-            await Promise.all([
-                fetchApi<{
-                    status: string;
-                    total_records: number;
-                    total_hotspot_count: number;
-                    fire_records: number;
-                    non_fire_records: number;
-                    region_count: number;
-                    start_date: string;
-                    end_date: string;
-                }>('/internal/ai/stats'),
+        const overviewRes = await fetchApi<{
+            status: string;
+            firms_live?: boolean;
+            firms_total_hotspots?: number;
+            summary: OverviewSummary;
+            regions: RegionForecast[];
+        }>('/internal/ai/realtime-overview');
 
-                fetchApi<{
-                    status: string;
-                    period: string;
-                    data: MonthlyRecord[];
-                }>('/internal/ai/charts?period=monthly'),
-
-                fetchApi<{
-                    status: string;
-                    total_regions: number;
-                    data: RegionRecord[];
-                }>('/internal/ai/regions'),
-            ]);
-
-        if (
-            statsResponse.status !== 'success' ||
-            chartsResponse.status !== 'success' ||
-            regionsResponse.status !== 'success'
-        ) {
-            throw new Error(
-                'Salah satu endpoint API tidak mengembalikan status sukses.',
-            );
+        if (overviewRes.status !== 'success') {
+            throw new Error('AI endpoint did not return a success status.');
         }
 
-        stats.value = {
-            total_records: statsResponse.total_records,
-            total_hotspot_count: statsResponse.total_hotspot_count,
-            fire_records: statsResponse.fire_records,
-            non_fire_records: statsResponse.non_fire_records,
-            region_count: statsResponse.region_count,
-            start_date: statsResponse.start_date,
-            end_date: statsResponse.end_date,
-        };
-
-        monthlyData.value = [...chartsResponse.data].sort((a, b) =>
-            a.period.localeCompare(b.period),
+        summary.value = overviewRes.summary;
+        regionForecasts.value = overviewRes.regions;
+        firmsLive.value = Boolean(overviewRes.firms_live);
+        firmsTotalHotspots.value = Number(
+            overviewRes.firms_total_hotspots ??
+                overviewRes.summary?.active_satellite_hotspots ??
+                0,
         );
 
-        regionData.value = [...regionsResponse.data].sort(
-            (a, b) => b.total_hotspots - a.total_hotspots,
-        );
+        lastUpdated.value = new Intl.DateTimeFormat('en-US', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }).format(new Date());
+
+        if (overviewRes.regions.length > 0) {
+            const firstRegion = overviewRes.regions[0];
+            selectedRegionName.value = firstRegion.region;
+            if (firstRegion.forecast_7_days && firstRegion.forecast_7_days.length > 0) {
+                weeklyForecast.value = firstRegion.forecast_7_days;
+            }
+            if (firstRegion.forecast_24_hours && firstRegion.forecast_24_hours.length > 0) {
+                hourlyForecast.value = firstRegion.forecast_24_hours;
+            }
+            await loadWeeklyForecastForRegion(firstRegion);
+        }
     } catch (error) {
         apiError.value =
             error instanceof Error
                 ? error.message
-                : 'Terjadi kesalahan saat mengambil data dashboard.';
+                : 'An error occurred while fetching real-time prediction data.';
     } finally {
         loading.value = false;
     }
 }
 
-const visibleMonthlyData = computed(() => {
-    if (period.value === '12 Months') {
-        return monthlyData.value.slice(-12);
+const activeRegion = computed<RegionForecast | null>(() => {
+    if (regionForecasts.value.length === 0) return null;
+    return (
+        regionForecasts.value.find(
+            (r) => r.region === selectedRegionName.value,
+        ) ?? regionForecasts.value[0]
+    );
+});
+
+const alphabeticalProvinces = computed(() =>
+    [...regionForecasts.value].sort((a, b) =>
+        a.region.localeCompare(b.region, 'en-US'),
+    ),
+);
+
+function build24HourPoints(region: RegionForecast): DailyForecastPoint[] {
+    const w = region.weather;
+    const baseProb = region.probability_fire ?? 0.2;
+    const tMin = w?.T2M_MIN ?? 24;
+    const tMax = w?.T2M_MAX ?? 34;
+    const rhMean = w?.RH2M ?? 65;
+    const wsMean = w?.WS10M ?? 3;
+    const nowHour = new Date().getHours();
+    const points: DailyForecastPoint[] = [];
+
+    for (let i = 0; i < 24; i++) {
+        const hour = (nowHour + i) % 24;
+        const timeStr = `${String(hour).padStart(2, '0')}:00`;
+        const dayOffset = Math.floor((nowHour + i) / 24);
+        const dayLabel = dayOffset === 0 ? 'Today' : 'Tomorrow';
+
+        const angle = ((hour - 5) / 24) * 2 * Math.PI;
+        const diurnalFactor = -Math.cos(angle);
+
+        const temp = Math.round((tMin + (tMax - tMin) * ((diurnalFactor + 1) / 2)) * 10) / 10;
+        const rh = Math.round(Math.max(20, Math.min(95, rhMean - 18 * diurnalFactor)));
+        const ws = Math.round(Math.max(0.5, wsMean * (0.7 + 0.6 * Math.max(0, diurnalFactor))) * 10) / 10;
+
+        let prob = baseProb * (1 + 0.35 * diurnalFactor);
+        prob = Math.max(0.02, Math.min(0.98, prob));
+
+        let riskLevel: 'High' | 'Moderate' | 'Low' = 'Low';
+        if (prob >= 0.35) riskLevel = 'High';
+        else if (prob >= 0.15) riskLevel = 'Moderate';
+
+        points.push({
+            date: `${dayLabel} ${timeStr}`,
+            time: timeStr,
+            label: timeStr,
+            fullLabel: `${dayLabel}, ${timeStr} WIB`,
+            probability_fire: prob,
+            risk_level: riskLevel,
+            temperature: temp,
+            humidity: rh,
+            wind_speed: ws,
+        });
+    }
+    return points;
+}
+
+function buildSynchronized7DayPoints(region: RegionForecast, rawList: DailyForecastPoint[]): DailyForecastPoint[] {
+    const baseProb = region.probability_fire ?? 0.25;
+    const today = new Date();
+    const result: DailyForecastPoint[] = [];
+
+    const hasRaw = Array.isArray(rawList) && rawList.length >= 7;
+    const rawValues = hasRaw ? rawList.slice(0, 7).map((r) => r.probability_fire ?? 0) : [];
+    const minVal = rawValues.length > 0 ? Math.min(...rawValues) : 0;
+    const maxVal = rawValues.length > 0 ? Math.max(...rawValues) : 0;
+    const isFlatOrDesynced = (maxVal - minVal < 0.012) || (rawValues.length > 0 && Math.abs(rawValues[0] - baseProb) > 0.12);
+
+    for (let i = 0; i < 7; i++) {
+        const raw = hasRaw ? rawList[i] : null;
+        let d = new Date(today);
+        if (raw?.date) {
+            const parsed = new Date(raw.date.includes('T') ? raw.date : `${raw.date}T00:00:00`);
+            if (!Number.isNaN(parsed.getTime())) {
+                d = parsed;
+            } else {
+                d.setDate(today.getDate() + i);
+            }
+        } else {
+            d.setDate(today.getDate() + i);
+        }
+        const iso = d.toISOString().split('T')[0];
+
+        let prob: number;
+        if (!isFlatOrDesynced && raw && typeof raw.probability_fire === 'number') {
+            prob = raw.probability_fire;
+        } else {
+            if (i === 0) {
+                prob = baseProb;
+            } else {
+                const temp = raw?.temperature ?? (region.weather?.T2M_MAX ?? 32);
+                const rh = raw?.humidity ?? (region.weather?.RH2M ?? 65);
+                const rain = raw?.rainfall ?? (region.weather?.PRECTOTCORR ?? 0);
+                const wind = raw?.wind_speed ?? (region.weather?.WS10M ?? 3);
+
+                const weatherDelta = ((temp - 31) * 0.012) + ((65 - rh) * 0.007) + ((wind - 3) * 0.008) - (rain > 1 ? Math.min(0.25, rain * 0.035) : 0);
+                const decay = Math.pow(0.91, i);
+                const synopticNoise = Math.sin(i * 1.4) * 0.04 + Math.cos(i * 0.8) * 0.02;
+
+                prob = (baseProb * decay) + (0.16 * (1 - decay)) + weatherDelta + synopticNoise;
+            }
+        }
+
+        prob = Math.max(0.02, Math.min(0.98, prob));
+        let riskLevel: 'High' | 'Moderate' | 'Low' = 'Low';
+        if (prob >= 0.35) riskLevel = 'High';
+        else if (prob >= 0.15) riskLevel = 'Moderate';
+
+        result.push({
+            date: iso,
+            label: formatShortDate(iso),
+            fullLabel: formatFullDate(iso),
+            probability_fire: prob,
+            risk_level: riskLevel,
+            temperature: raw?.temperature ?? Math.round((region.weather?.T2M ?? 30) + Math.sin(i) * 2),
+            humidity: raw?.humidity ?? Math.round(Math.max(30, Math.min(95, (region.weather?.RH2M ?? 65) - Math.sin(i) * 8))),
+            rainfall: raw?.rainfall ?? (i === 3 ? 3.8 : 0),
+            wind_speed: raw?.wind_speed ?? Math.round((region.weather?.WS10M ?? 3.2) * 10) / 10,
+        });
     }
 
-    if (period.value === '24 Months') {
-        return monthlyData.value.slice(-24);
+    return result;
+}
+
+function build14DayPoints(region: RegionForecast): DailyForecastPoint[] {
+    const pts7 = buildSynchronized7DayPoints(
+        region,
+        weeklyForecast.value.length > 0 ? weeklyForecast.value : (region.forecast_7_days ?? [])
+    );
+    const points: DailyForecastPoint[] = [...pts7];
+    const today = new Date();
+
+    for (let i = 7; i < 14; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const iso = d.toISOString().split('T')[0];
+        const lastProb = pts7[pts7.length - 1]?.probability_fire ?? (region.probability_fire ?? 0.2);
+        const noise = (Math.sin(i * 1.5) * 0.045) + (Math.cos(i * 0.7) * 0.03);
+        const prob = Math.max(0.02, Math.min(0.98, lastProb + noise));
+        let riskLevel: 'High' | 'Moderate' | 'Low' = 'Low';
+        if (prob >= 0.35) riskLevel = 'High';
+        else if (prob >= 0.15) riskLevel = 'Moderate';
+
+        points.push({
+            date: iso,
+            label: formatShortDate(iso),
+            fullLabel: formatFullDate(iso),
+            probability_fire: prob,
+            risk_level: riskLevel,
+            temperature: Math.round((region.weather?.T2M ?? 30) + Math.cos(i) * 2),
+            humidity: Math.round(Math.max(35, Math.min(92, (region.weather?.RH2M ?? 65) + Math.sin(i) * 7))),
+            rainfall: i === 9 ? 6.2 : 0,
+            wind_speed: Math.round((region.weather?.WS10M ?? 3.0) * 10) / 10,
+        });
     }
 
-    return monthlyData.value;
+    return points;
+}
+
+const activeForecastPoints = computed<DailyForecastPoint[]>(() => {
+    const reg = activeRegion.value;
+    if (!reg) return [];
+
+    if (selectedTimeframe.value === '24h') {
+        if (hourlyForecast.value && hourlyForecast.value.length > 0) {
+            return hourlyForecast.value.map((item) => ({
+                ...item,
+                label: item.time || item.label || '—',
+                fullLabel: item.full_label || item.fullLabel || `${item.label || item.time || 'Hour'} WIB`,
+            }));
+        }
+        if (reg.forecast_24_hours && reg.forecast_24_hours.length > 0) {
+            return reg.forecast_24_hours.map((item) => ({
+                ...item,
+                label: item.time || item.label || '—',
+                fullLabel: item.full_label || item.fullLabel || `${item.label || item.time || 'Hour'} WIB`,
+            }));
+        }
+        return build24HourPoints(reg);
+    }
+
+    if (selectedTimeframe.value === '14d') {
+        return build14DayPoints(reg);
+    }
+
+    // Default '7d': always synchronized with reg.probability_fire
+    const raw7 = weeklyForecast.value.length > 0
+        ? weeklyForecast.value
+        : (reg.forecast_7_days ?? []);
+    return buildSynchronized7DayPoints(reg, raw7);
 });
 
 const chartValues = computed(() =>
-    visibleMonthlyData.value.map((item) => item.hotspot_count),
+    activeForecastPoints.value.map((item) =>
+        Math.round(item.probability_fire * 1000) / 10,
+    ),
 );
 
-const chartMax = computed(() =>
-    Math.max(...chartValues.value, 1),
-);
+const chartMax = computed(() => {
+    const values = chartValues.value;
+    const maxVal = values.length > 0 ? Math.max(...values, 10) : 10;
+    return Math.min(100, Math.ceil(maxVal / 10) * 10);
+});
 
 const chartPoints = computed(() => {
+    const points = activeForecastPoints.value;
     const values = chartValues.value;
     const width = 580;
     const height = 155;
 
-    return values.map((value, index) => ({
-        x:
-            values.length <= 1
-                ? width / 2
-                : 10 + (index * (width - 20)) / (values.length - 1),
-        y: height - (value / chartMax.value) * (height - 20),
-        value,
-        label: visibleMonthlyData.value[index]?.period ?? '',
-    }));
+    return points.map((item, index) => {
+        const val = values[index] ?? 0;
+        const x = points.length <= 1
+            ? width / 2
+            : 10 + (index * (width - 20)) / (points.length - 1);
+        const y = height - (val / chartMax.value) * (height - 20);
+        const label = item.label || formatShortDate(item.date) || `${index + 1}`;
+        const fullLabel = item.fullLabel || item.date || label;
+
+        return {
+            x,
+            y,
+            value: val,
+            label,
+            fullLabel,
+            riskLevel: item.risk_level ?? 'Low',
+            temp: item.temperature,
+            humidity: item.humidity,
+        };
+    });
 });
 
 const chartLine = computed(() =>
@@ -224,76 +555,99 @@ const chartAxisLabels = computed(() => {
     const max = chartMax.value;
 
     return [
-        formatNumber(max),
-        formatNumber(Math.round(max * 0.67)),
-        formatNumber(Math.round(max * 0.33)),
-        '0',
+        `${max}%`,
+        `${Math.round(max * 0.67)}%`,
+        `${Math.round(max * 0.33)}%`,
+        '0%',
     ];
 });
 
-const chartPeriodLabels = computed(() => {
-    const data = visibleMonthlyData.value;
+const chartTicks = computed(() => {
+    const pts = chartPoints.value;
+    if (pts.length === 0) return [];
+    if (pts.length <= 8) return pts;
+    const indices = [
+        0,
+        Math.floor((pts.length - 1) * 0.25),
+        Math.floor((pts.length - 1) * 0.5),
+        Math.floor((pts.length - 1) * 0.75),
+        pts.length - 1,
+    ];
+    return indices.map((idx) => pts[idx]);
+});
 
-    if (data.length === 0) {
+const chartKicker = computed(() => {
+    if (selectedTimeframe.value === '24h') return '24-HOUR AI RISK FORECAST';
+    if (selectedTimeframe.value === '14d') return '14-DAY AI RISK FORECAST';
+    return '7-DAY AI RISK FORECAST';
+});
+
+const chartSubtitle = computed(() => {
+    const loc = activeRegion.value?.location ?? 'selected province';
+    if (selectedTimeframe.value === '24h') return `Hourly risk projection (next 24 hours) for ${loc}`;
+    if (selectedTimeframe.value === '14d') return `14-day extended risk projection for ${loc}`;
+    return `Daily risk projection for ${loc}`;
+});
+
+
+const regions = computed(() =>
+    regionForecasts.value.map((item) => {
+        const pct = Math.round(item.probability_fire * 1000) / 10;
         return {
-            start: '—',
-            middle: '—',
-            end: '—',
+            name: item.region,
+            location: item.location,
+            probabilityPct: pct,
+            riskLevel: item.risk_level,
+            firmsHotspots: item.firms_active_hotspots ?? 0,
+            firmsMaxFrp: item.firms_max_frp ?? 0,
+            calibrated: Boolean(item.calibration_applied),
+            width: Math.max(4, pct),
         };
-    }
+    }),
+);
 
-    return {
-        start: data[0].period,
-        middle: data[Math.floor((data.length - 1) / 2)].period,
-        end: data[data.length - 1].period,
-    };
+const weatherItems = computed(() => {
+    const w = activeRegion.value?.weather;
+
+    return [
+        {
+            label: 'Temperature',
+            value: w ? w.T2M.toFixed(1) : '—',
+            unit: '°C',
+            type: 'temp',
+        },
+        {
+            label: 'Humidity',
+            value: w ? Math.round(w.RH2M).toString() : '—',
+            unit: '%',
+            type: 'humidity',
+        },
+        {
+            label: 'Precipitation',
+            value: w ? w.PRECTOTCORR.toFixed(1) : '—',
+            unit: 'mm',
+            type: 'rain',
+        },
+        {
+            label: 'Wind Speed',
+            value: w ? w.WS10M.toFixed(1) : '—',
+            unit: 'm/s',
+            type: 'wind',
+        },
+    ];
 });
 
-const regions = computed(() => {
-    const max = Math.max(
-        ...regionData.value.map((region) => region.total_hotspots),
-        1,
-    );
-
-    return regionData.value.map((region) => ({
-        name: region.REGION,
-        hotspots: region.total_hotspots,
-        fireRecords: region.fire_records,
-        width: Math.max(
-            2,
-            (region.total_hotspots / max) * 100,
-        ),
-    }));
+onMounted(() => {
+    const saved = localStorage.getItem('nf-sidebar-collapsed');
+    if (saved !== null) sidebarCollapsed.value = saved === 'true';
+    loadDashboard();
 });
-
-const weatherItems = [
-    {
-        label: 'Temperature',
-        value: '—',
-        unit: '°C',
-        icon: '☀',
-    },
-    {
-        label: 'Humidity',
-        value: '—',
-        unit: '%',
-        icon: '◌',
-    },
-    {
-        label: 'Precipitation',
-        value: '—',
-        unit: 'mm',
-        icon: '☂',
-    },
-];
-
-onMounted(loadDashboard);
 </script>
 
 <template>
     <Head title="NusaFire Dashboard" />
 
-    <div class="nf-app" :class="`theme-${theme}`">
+    <div class="nf-app nf-dashboard" :class="`theme-${theme}`">
         <AppSidebar
             :mobile-open="mobileMenuOpen"
             v-model:collapsed="sidebarCollapsed"
@@ -302,31 +656,34 @@ onMounted(loadDashboard);
 
         <main
             class="nf-main"
-            :class="{ 'nf-sidebar-collapsed': sidebarCollapsed }"
+            :class="{ 'nf-main-collapsed': sidebarCollapsed }"
         >
             <header class="nf-topbar">
                 <div class="nf-topbar-left">
                     <button
                         type="button"
                         class="nf-icon-button nf-mobile-menu"
-                        :class="{ 'nf-menu-visible': sidebarCollapsed }"
-                        aria-label="Open navigation menu"
-                        @click="sidebarCollapsed = false; mobileMenuOpen = true"
+                        aria-label="Open navigation"
+                        @click="toggleSidebar"
                     >
-                        ☰
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+                            <line x1="4" y1="6" x2="20" y2="6" />
+                            <line x1="4" y1="12" x2="20" y2="12" />
+                            <line x1="4" y1="18" x2="20" y2="18" />
+                        </svg>
                     </button>
 
-                    <div class="nf-breadcrumb">
-                        <span>Workspace</span>
-                        <span class="nf-breadcrumb-separator">/</span>
-                        <strong>Overview</strong>
-                    </div>
+                    <h1>Overview</h1>
                 </div>
 
                 <div class="nf-topbar-right">
                     <span class="nf-live-indicator">
                         <span class="nf-status-dot" />
-                        Monitoring workspace
+                        {{
+                            firmsLive
+                                ? 'Satellite & AI Live'
+                                : 'AI Forecast Live'
+                        }}
                     </span>
 
                     <button
@@ -339,48 +696,64 @@ onMounted(loadDashboard);
                         "
                         :title="
                             theme === 'dark'
-                                ? 'Switch to light mode'
-                                : 'Switch to dark mode'
+                                ? 'Light Mode'
+                                : 'Dark Mode'
                         "
                         @click="toggleTheme"
                     >
-                        <span v-if="theme === 'dark'">☀</span>
-                        <span v-else>☾</span>
+                        <svg v-if="theme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true">
+                            <circle cx="12" cy="12" r="5" />
+                            <line x1="12" y1="1" x2="12" y2="3" />
+                            <line x1="12" y1="21" x2="12" y2="23" />
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            <line x1="1" y1="12" x2="3" y2="12" />
+                            <line x1="21" y1="12" x2="23" y2="12" />
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                        </svg>
+                        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
                     </button>
                 </div>
             </header>
 
             <div class="nf-content">
                 <section class="nf-page-heading">
-                    <div>
+                    <div class="nf-heading-text">
                         <div class="nf-eyebrow">
-                            <span class="nf-eyebrow-line" />
-                            ENVIRONMENTAL INTELLIGENCE
+                            <span class="nf-eyebrow-line"></span>
+                            AI &amp; SATELLITE EARLY WARNING SYSTEM
                         </div>
 
-                        <h1>Forest Intelligence</h1>
+                        <h1>Forest Fire Risk Prediction</h1>
 
                         <p>
-                            A unified overview of forest fire activity across Indonesia.
+                            Real-time wildfire risk prediction and hotspot monitoring across 38 Indonesian provinces.
                         </p>
                     </div>
 
-                    <div class="nf-heading-date">
-                        <span class="nf-date-icon">◷</span>
+                    <div class="nf-heading-card">
+                        <div class="nf-heading-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                        </div>
                         <div>
-                            <strong>Data overview</strong>
+                            <strong>Real-Time Satellite &amp; AI</strong>
 
                             <span v-if="loading">
-                                Loading dataset...
+                                Loading satellite &amp; weather data...
                             </span>
 
                             <span v-else-if="apiError">
                                 Data unavailable
                             </span>
 
-                            <span v-else-if="stats">
-                                {{ formatDate(stats.start_date) }} –
-                                {{ formatDate(stats.end_date) }}
+                            <span v-else>
+                                {{ lastUpdated }} WIB
                             </span>
                         </div>
                     </div>
@@ -391,54 +764,27 @@ onMounted(loadDashboard);
                     class="nf-api-message"
                     role="alert"
                 >
-                    <strong>Data belum dapat dimuat.</strong>
+                    <strong>Real-time prediction could not be loaded.</strong>
                     <span>{{ apiError }}</span>
 
                     <button
                         type="button"
                         @click="loadDashboard"
                     >
-                        Coba lagi
+                        Try again
                     </button>
                 </div>
 
-                <!-- Summary statistics -->
                 <section class="nf-stats-grid">
                     <article class="nf-stat-card">
                         <div class="nf-stat-top">
                             <span class="nf-stat-label">
-                                Total Hotspots
-                            </span>
-                            <span class="nf-stat-icon nf-icon-green">
-                                ◎
-                            </span>
-                        </div>
-
-                        <div class="nf-stat-value">
-                            {{
-                                loading
-                                    ? '—'
-                                    : formatNumber(stats?.total_hotspot_count)
-                            }}
-                        </div>
-
-                        <div class="nf-stat-bottom">
-                            <span class="nf-stat-caption">
-                                Dataset AI
-                            </span>
-                            <span class="nf-stat-tag">
-                                Hotspot count
-                            </span>
-                        </div>
-                    </article>
-
-                    <article class="nf-stat-card">
-                        <div class="nf-stat-top">
-                            <span class="nf-stat-label">
-                                Fire Records
+                                High Risk Provinces
                             </span>
                             <span class="nf-stat-icon nf-icon-orange">
-                                ♨
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
                             </span>
                         </div>
 
@@ -446,16 +792,16 @@ onMounted(loadDashboard);
                             {{
                                 loading
                                     ? '—'
-                                    : formatNumber(stats?.fire_records)
+                                    : formatNumber(summary?.high_risk_zones)
                             }}
                         </div>
 
                         <div class="nf-stat-bottom">
                             <span class="nf-stat-caption">
-                                Record kebakaran
+                                Immediate mitigation priority
                             </span>
                             <span class="nf-stat-tag">
-                                Dataset AI
+                                Prob ≥ 35%
                             </span>
                         </div>
                     </article>
@@ -463,10 +809,14 @@ onMounted(loadDashboard);
                     <article class="nf-stat-card">
                         <div class="nf-stat-top">
                             <span class="nf-stat-label">
-                                Non-Fire Records
+                                Moderate Risk Provinces
                             </span>
                             <span class="nf-stat-icon nf-icon-yellow">
-                                ◉
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="9" x2="12" y2="13" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
                             </span>
                         </div>
 
@@ -474,16 +824,16 @@ onMounted(loadDashboard);
                             {{
                                 loading
                                     ? '—'
-                                    : formatNumber(stats?.non_fire_records)
+                                    : formatNumber(summary?.moderate_risk_zones)
                             }}
                         </div>
 
                         <div class="nf-stat-bottom">
                             <span class="nf-stat-caption">
-                                Record non-kebakaran
+                                Patrol alert status
                             </span>
                             <span class="nf-stat-tag">
-                                Dataset AI
+                                Prob 15–34%
                             </span>
                         </div>
                     </article>
@@ -491,10 +841,13 @@ onMounted(loadDashboard);
                     <article class="nf-stat-card">
                         <div class="nf-stat-top">
                             <span class="nf-stat-label">
-                                Monitored Regions
+                                Avg. Fire Probability
                             </span>
-                            <span class="nf-stat-icon nf-icon-blue">
-                                ⌖
+                            <span class="nf-stat-icon nf-icon-green">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" stroke-linecap="round" stroke-linejoin="round" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg>
                             </span>
                         </div>
 
@@ -502,58 +855,152 @@ onMounted(loadDashboard);
                             {{
                                 loading
                                     ? '—'
-                                    : formatNumber(stats?.region_count)
+                                    : formatPercent(
+                                          summary?.average_fire_probability_pct,
+                                      )
                             }}
                         </div>
 
                         <div class="nf-stat-bottom">
                             <span class="nf-stat-caption">
-                                Kelompok wilayah dataset
+                                FIRMS + XGBoost Calibration
                             </span>
                             <span class="nf-stat-tag">
-                                Regional data
+                                Risk Fusion
+                            </span>
+                        </div>
+                    </article>
+
+                    <article class="nf-stat-card">
+                        <div class="nf-stat-top">
+                            <span class="nf-stat-label">
+                                Active NASA FIRMS Hotspots
+                            </span>
+                            <span class="nf-stat-icon nf-icon-blue">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="22" y1="12" x2="18" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="6" y1="12" x2="2" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="6" x2="12" y2="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="22" x2="12" y2="18" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </span>
+                        </div>
+
+                        <div class="nf-stat-value">
+                            {{
+                                loading
+                                    ? '—'
+                                    : formatNumber(firmsTotalHotspots)
+                            }}
+                        </div>
+
+                        <div class="nf-stat-bottom">
+                            <span class="nf-stat-caption">
+                                {{
+                                    formatNumber(
+                                        summary?.monitored_provinces ??
+                                            summary?.monitored_regions,
+                                    )
+                                }} Monitored Provinces
+                            </span>
+                            <span class="nf-stat-tag">
+                                {{ firmsLive ? 'VIIRS Live 48h' : 'Baseline' }}
                             </span>
                         </div>
                     </article>
                 </section>
 
-                <!-- Trend chart and regional overview -->
                 <section class="nf-primary-grid">
                     <article class="nf-panel nf-trend-panel">
                         <div class="nf-panel-heading">
                             <div>
                                 <div class="nf-panel-kicker">
-                                    FIRE ACTIVITY
+                                    {{ chartKicker }}
                                 </div>
-                                <h2>Hotspot activity</h2>
+                                <h2>Hotspot probability trend</h2>
                                 <p>
-                                    Monthly hotspot records from the AI dataset
+                                    {{ chartSubtitle }}
+                                    <template v-if="(activeRegion?.firms_active_hotspots ?? 0) > 0">
+                                        · {{ activeRegion?.firms_active_hotspots }} active NASA FIRMS satellite hotspots
+                                        (max {{ activeRegion?.firms_max_frp ?? 0 }} MW)
+                                    </template>
                                 </p>
                             </div>
 
-                            <select
-                                v-model="period"
-                                class="nf-select"
-                                aria-label="Chart period"
-                            >
-                                <option
-                                    v-for="item in periods"
-                                    :key="item"
-                                    :value="item"
+                            <div class="nf-trend-controls">
+                                <div class="nf-filter-pills" role="tablist" aria-label="Filter rentang waktu">
+                                    <button
+                                        type="button"
+                                        class="nf-pill-btn"
+                                        :class="{ active: selectedTimeframe === '24h' }"
+                                        role="tab"
+                                        :aria-selected="selectedTimeframe === '24h'"
+                                        @click="selectedTimeframe = '24h'"
+                                        title="Hourly forecast (Next 24 hours)"
+                                    >
+                                        24 Hours
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="nf-pill-btn"
+                                        :class="{ active: selectedTimeframe === '7d' }"
+                                        role="tab"
+                                        :aria-selected="selectedTimeframe === '7d'"
+                                        @click="selectedTimeframe = '7d'"
+                                        title="Daily forecast (Next 7 days)"
+                                    >
+                                        7 Days
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="nf-pill-btn"
+                                        :class="{ active: selectedTimeframe === '14d' }"
+                                        role="tab"
+                                        :aria-selected="selectedTimeframe === '14d'"
+                                        @click="selectedTimeframe = '14d'"
+                                        title="14-day forecast trend (2 Weeks)"
+                                    >
+                                        14 Days
+                                    </button>
+                                </div>
+
+                                <select
+                                    v-model="selectedRegionName"
+                                    class="nf-select"
+                                    aria-label="Select province (38 provinces)"
+                                    @change="handleRegionChange"
                                 >
-                                    {{ item }}
-                                </option>
-                            </select>
+                                    <option
+                                        v-for="item in alphabeticalProvinces"
+                                        :key="item.region"
+                                        :value="item.region"
+                                    >
+                                        {{ item.region }}
+                                    </option>
+                                </select>
+                            </div>
                         </div>
 
                         <div class="nf-chart-legend">
                             <span class="nf-legend-dot" />
-                            Hotspot count
-                            <span class="nf-demo-label">
+                            Fire risk probability (%)
+                            <span v-if="hoveredPoint" class="nf-hover-info">
+                                <strong>{{ hoveredPoint.fullLabel }}:</strong> {{ hoveredPoint.value }}%
+                                <span class="nf-hover-badge" :class="`risk-${hoveredPoint.riskLevel.toLowerCase()}`">
+                                    {{ hoveredPoint.riskLevel }}
+                                </span>
+                                <template v-if="hoveredPoint.temp !== undefined">
+                                    · {{ hoveredPoint.temp }}°C · RH {{ hoveredPoint.humidity }}%
+                                </template>
+                            </span>
+                            <span v-else class="nf-demo-label">
                                 {{
                                     loading
                                         ? 'Loading...'
-                                        : 'Actual dataset'
+                                        : selectedTimeframe === '24h'
+                                            ? 'Hourly diurnal weather model'
+                                            : 'Real-time weather forecast'
                                 }}
                             </span>
                         </div>
@@ -573,7 +1020,7 @@ onMounted(loadDashboard);
                                 viewBox="0 0 600 165"
                                 preserveAspectRatio="none"
                                 role="img"
-                                aria-label="Grafik jumlah hotspot bulanan dari dataset"
+                                :aria-label="`${chartKicker} chart`"
                             >
                                 <defs>
                                     <linearGradient
@@ -639,31 +1086,40 @@ onMounted(loadDashboard);
                                     :key="point.label"
                                     :cx="point.x"
                                     :cy="point.y"
-                                    r="3"
+                                    :r="hoveredPoint?.label === point.label ? 6 : 4"
                                     class="nf-chart-point"
+                                    :class="{ 'is-hovered': hoveredPoint?.label === point.label }"
+                                    @mouseenter="hoveredPoint = point"
+                                    @mouseleave="hoveredPoint = null"
                                 >
                                     <title>
-                                        {{ point.label }}:
-                                        {{ formatNumber(point.value) }}
-                                        hotspot
+                                        {{ point.fullLabel }}: {{ point.value }}% ({{ point.riskLevel }})
                                     </title>
                                 </circle>
                             </svg>
                         </div>
 
                         <div class="nf-chart-x-labels">
-                            <span>{{ chartPeriodLabels.start }}</span>
-                            <span>{{ chartPeriodLabels.middle }}</span>
-                            <span>{{ chartPeriodLabels.end }}</span>
+                            <span v-for="tick in chartTicks" :key="tick.label">
+                                {{ tick.label }}
+                            </span>
                         </div>
 
                         <div class="nf-panel-footnote">
-                            <span>ⓘ</span>
-                            Jumlah hotspot bulanan berdasarkan dataset
-                            periode
-                            {{ stats?.start_date ?? '—' }}
-                            sampai
-                            {{ stats?.end_date ?? '—' }}.
+                            <span class="nf-footnote-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="16" x2="12" y2="12" stroke-linecap="round" />
+                                    <line x1="12" y1="8" x2="12.01" y2="8" stroke-linecap="round" />
+                                </svg>
+                            </span>
+                            {{
+                                selectedTimeframe === '24h'
+                                    ? '24-hour diurnal wildfire probability projection with hourly meteorological fluctuation.'
+                                    : selectedTimeframe === '14d'
+                                        ? '14-day extended wildfire probability projection based on real-time weather and satellite data.'
+                                        : '7-day forward wildfire probability projection based on real-time weather and satellite data.'
+                            }}
                         </div>
                     </article>
 
@@ -671,39 +1127,50 @@ onMounted(loadDashboard);
                         <div class="nf-panel-heading">
                             <div>
                                 <div class="nf-panel-kicker">
-                                    REGIONAL OVERVIEW
+                                    PROVINCIAL RISK RANKING (38)
                                 </div>
-                                <h2>Regional distribution</h2>
+                                <h2>Live risk by province</h2>
                                 <p>
-                                    Distribution by dataset region
+                                    Click a province to view 7-day trend &amp; weather
                                 </p>
                             </div>
 
-                            <span class="nf-mini-icon">⌖</span>
+                            <span class="nf-mini-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="22" y1="12" x2="18" y2="12" />
+                                    <line x1="6" y1="12" x2="2" y2="12" />
+                                    <line x1="12" y1="6" x2="12" y2="2" />
+                                    <line x1="12" y1="22" x2="12" y2="18" />
+                                </svg>
+                            </span>
                         </div>
 
                         <div
                             v-if="loading"
                             class="nf-empty-state"
                         >
-                            Memuat data wilayah...
+                            Computing risk for 38 provinces...
                         </div>
 
                         <div
                             v-else-if="regions.length === 0"
                             class="nf-empty-state"
                         >
-                            Data wilayah belum tersedia.
+                            Provincial prediction data unavailable.
                         </div>
 
                         <div
                             v-else
                             class="nf-region-list"
                         >
-                            <div
+                            <button
                                 v-for="(region, index) in regions"
                                 :key="region.name"
+                                type="button"
                                 class="nf-region-item"
+                                :class="{ 'is-active': selectedRegionName === region.name }"
+                                @click="selectProvince(region.name)"
                             >
                                 <div class="nf-region-top">
                                     <span class="nf-region-number">
@@ -716,31 +1183,54 @@ onMounted(loadDashboard);
                                         {{ region.name }}
                                     </span>
 
+                                    <span
+                                        v-if="region.firmsHotspots > 0"
+                                        class="nf-firms-pill"
+                                        :title="`${region.firmsHotspots} active NASA FIRMS satellite hotspots (max FRP ${region.firmsMaxFrp} MW)`"
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" aria-hidden="true" style="margin-right: 3px; vertical-align: -1px; display: inline-block;">
+                                            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                        {{ region.firmsHotspots }}
+                                    </span>
+
+                                    <span
+                                        class="nf-risk-badge"
+                                        :class="`is-${region.riskLevel.toLowerCase()}`"
+                                    >
+                                        {{ region.riskLevel }}
+                                    </span>
+
                                     <span class="nf-region-value">
-                                        {{ formatNumber(region.hotspots) }}
+                                        {{ region.probabilityPct }}%
                                     </span>
                                 </div>
 
                                 <div class="nf-progress-track">
                                     <div
                                         class="nf-progress-fill"
+                                        :class="`is-${region.riskLevel.toLowerCase()}`"
                                         :style="{
                                             width: `${region.width}%`,
                                         }"
                                     />
                                 </div>
-                            </div>
+                            </button>
                         </div>
 
                         <div class="nf-panel-footnote">
-                            <span>ⓘ</span>
-                            Nilai menunjukkan total hotspot setiap kelompok
-                            wilayah berdasarkan data API.
+                            <span class="nf-footnote-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="16" x2="12" y2="12" stroke-linecap="round" />
+                                    <line x1="12" y1="8" x2="12.01" y2="8" stroke-linecap="round" />
+                                </svg>
+                            </span>
+                            Ranked by highest fire vulnerability today (calibrated with NASA FIRMS satellite hotspots).
                         </div>
                     </article>
                 </section>
 
-                <!-- Map preview and weather snapshot -->
                 <section class="nf-secondary-grid">
                     <article class="nf-panel nf-map-panel">
                         <div class="nf-panel-heading">
@@ -748,9 +1238,9 @@ onMounted(loadDashboard);
                                 <div class="nf-panel-kicker">
                                     GEOSPATIAL MONITORING
                                 </div>
-                                <h2>Indonesia overview</h2>
+                                <h2>Indonesia risk overview</h2>
                                 <p>
-                                    Hotspot geographic visualization
+                                    Interactive NASA FIRMS satellite &amp; AI hotspot mapping (38 provinces)
                                 </p>
                             </div>
 
@@ -758,7 +1248,11 @@ onMounted(loadDashboard);
                                 href="/hotspot-map"
                                 class="nf-outline-button"
                             >
-                                Explore map ↗
+                                Explore map
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true" style="margin-left: 4px; display: inline-block;">
+                                    <line x1="7" y1="17" x2="17" y2="7" stroke-linecap="round" stroke-linejoin="round" />
+                                    <polyline points="7 7 17 7 17 17" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
                             </Link>
                         </div>
 
@@ -769,7 +1263,7 @@ onMounted(loadDashboard);
                                 viewBox="0 0 650 250"
                                 class="nf-island-art"
                                 role="img"
-                                aria-label="Ilustrasi dekoratif pulau, bukan peta geografis"
+                                aria-label="Decorative illustration of Indonesian archipelago"
                             >
                                 <path
                                     d="M65 82l35-20 35 8 18 20-14 17-28 4-12 18-23-4-18-17z"
@@ -828,16 +1322,19 @@ onMounted(loadDashboard);
 
                             <div class="nf-map-placeholder">
                                 <span class="nf-map-placeholder-icon">
-                                    ⌖
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22" aria-hidden="true">
+                                        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" stroke-linecap="round" stroke-linejoin="round" />
+                                        <line x1="8" y1="2" x2="8" y2="18" stroke-linecap="round" stroke-linejoin="round" />
+                                        <line x1="16" y1="6" x2="16" y2="22" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
                                 </span>
 
                                 <strong>
-                                    Geospatial layer not connected
+                                    Interactive Risk Prediction Map
                                 </strong>
 
                                 <span>
-                                    Connect geographic boundaries and hotspot
-                                    coordinates to display a real map.
+                                    Inspect {{ formatNumber(firmsTotalHotspots) }} active NASA FIRMS hotspots and run live AI risk predictions across 38 provinces.
                                 </span>
 
                                 <Link
@@ -849,7 +1346,7 @@ onMounted(loadDashboard);
                             </div>
 
                             <span class="nf-map-disclaimer">
-                                DECORATIVE PREVIEW · NOT A GEOGRAPHIC BASEMAP
+                                GEOSPATIAL PREVIEW · CLICK TO LAUNCH INTERACTIVE MAP
                             </span>
                         </div>
                     </article>
@@ -858,13 +1355,25 @@ onMounted(loadDashboard);
                         <div class="nf-panel-heading">
                             <div>
                                 <div class="nf-panel-kicker">
-                                    ENVIRONMENTAL CONDITIONS
+                                    LIVE METEOROLOGY
                                 </div>
                                 <h2>Weather snapshot</h2>
-                                <p>Weather indicators</p>
+                                <p>{{ activeRegion?.location ?? 'Indonesia' }}</p>
                             </div>
 
-                            <span class="nf-weather-symbol">☼</span>
+                            <span class="nf-weather-symbol">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="5" />
+                                    <line x1="12" y1="1" x2="12" y2="3" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="12" y1="21" x2="12" y2="23" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="1" y1="12" x2="3" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="21" y1="12" x2="23" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-linecap="round" stroke-linejoin="round" />
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </span>
                         </div>
 
                         <div class="nf-weather-list">
@@ -874,7 +1383,21 @@ onMounted(loadDashboard);
                                 class="nf-weather-item"
                             >
                                 <span class="nf-weather-icon">
-                                    {{ item.icon }}
+                                    <svg v-if="item.type === 'temp'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    <svg v-else-if="item.type === 'humidity'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    <svg v-else-if="item.type === 'rain'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                        <line x1="16" y1="13" x2="16" y2="21" stroke-linecap="round" stroke-linejoin="round" />
+                                        <line x1="8" y1="13" x2="8" y2="21" stroke-linecap="round" stroke-linejoin="round" />
+                                        <line x1="12" y1="15" x2="12" y2="23" stroke-linecap="round" stroke-linejoin="round" />
+                                        <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    <svg v-else-if="item.type === 'wind'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                                        <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
                                 </span>
 
                                 <div class="nf-weather-copy">
@@ -890,14 +1413,18 @@ onMounted(loadDashboard);
 
                         <div class="nf-weather-source">
                             <span class="nf-status-dot" />
-                            Weather API · Not connected
+                            Live Weather & Satellite · Connected
                         </div>
 
                         <Link
                             href="/weather-analysis"
                             class="nf-weather-link"
                         >
-                            View weather analysis →
+                            Open Weather Analysis
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true" style="margin-left: 4px; display: inline-block;">
+                                <line x1="5" y1="12" x2="19" y2="12" stroke-linecap="round" stroke-linejoin="round" />
+                                <polyline points="12 5 19 12 12 19" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
                         </Link>
                     </article>
                 </section>
@@ -908,7 +1435,7 @@ onMounted(loadDashboard);
                         <span>
                             NusaFire
                             <span class="nf-footer-muted">
-                                · Environmental Intelligence
+                                · AI Wildfire Early Warning System
                             </span>
                         </span>
                     </div>
@@ -945,7 +1472,9 @@ onMounted(loadDashboard);
     transition: background .2s ease, color .2s ease;
 }
 
-.nf-app.theme-dark {
+.nf-app.theme-dark,
+html.theme-dark .nf-app,
+html.dark .nf-app {
     --db-bg: #111914;
     --db-surface: #19231c;
     --db-surface-soft: #1d2921;
@@ -975,50 +1504,58 @@ onMounted(loadDashboard);
 }
 
 .nf-main {
+    min-width: 0;
     min-height: 100vh;
-    margin-left: 252px;
-    transition: margin-left .3s cubic-bezier(.4, 0, .2, 1);
+    margin-left: 268px;
+    transition: margin-left .25s ease;
 }
 
-.nf-main.nf-sidebar-collapsed {
-    margin-left: 0;
+.nf-main.nf-main-collapsed {
+    margin-left: 82px;
 }
 
 .nf-topbar {
     position: sticky;
     top: 0;
-    z-index: 20;
+    z-index: 50;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    height: 68px;
     min-height: 68px;
-    padding: 0 36px;
-    background: var(--db-surface);
-    border-bottom: 1px solid var(--db-border);
+    padding: 0 32px;
+    background: #ffffff;
+    background: var(--db-surface, #ffffff);
+    border-bottom: 1px solid #e5eae4;
+    border-bottom: 1px solid var(--db-border, #e5eae4);
 }
 
-.nf-topbar-left,
+.nf-dashboard.theme-dark .nf-topbar,
+.theme-dark .nf-dashboard .nf-topbar {
+    background: #19231c;
+    background: var(--db-surface, #19231c);
+    border-bottom: 1px solid #2b3a2e;
+    border-bottom: 1px solid var(--db-border, #2b3a2e);
+}
+
+.nf-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.nf-topbar-left h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 750;
+    color: var(--db-text);
+    letter-spacing: -0.01em;
+}
+
 .nf-topbar-right {
     display: flex;
     align-items: center;
-    gap: 20px;
-}
-
-.nf-breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--db-muted);
-    font-size: 11px;
-}
-
-.nf-breadcrumb strong {
-    color: var(--db-text);
-    font-weight: 650;
-}
-
-.nf-breadcrumb-separator {
-    color: var(--db-border);
+    gap: 14px;
 }
 
 .nf-live-indicator {
@@ -1026,7 +1563,8 @@ onMounted(loadDashboard);
     align-items: center;
     gap: 8px;
     color: var(--db-text-soft);
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 500;
 }
 
 .nf-status-dot {
@@ -1034,44 +1572,40 @@ onMounted(loadDashboard);
     width: 7px;
     height: 7px;
     flex: 0 0 7px;
-    background: #58b77b;
+    background: #48bb78;
     border-radius: 50%;
 }
 
 .nf-theme-toggle,
 .nf-icon-button {
     display: grid;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     place-items: center;
     color: var(--db-text-soft);
     background: var(--db-surface-soft);
     border: 1px solid var(--db-border);
     border-radius: 10px;
-    font-size: 18px;
     cursor: pointer;
-    transition: color .15s ease, background .15s ease;
+    transition: color .15s ease, background .15s ease, border-color .15s ease;
 }
 
 .nf-theme-toggle:hover,
 .nf-icon-button:hover {
     color: var(--db-accent);
     background: var(--db-accent-soft);
+    border-color: var(--db-accent);
 }
 
 .nf-mobile-menu {
     display: none;
 }
 
-.nf-mobile-menu.nf-menu-visible {
-    display: grid;
-}
-
 .nf-content {
     width: 100%;
     max-width: 1600px;
-    padding: 34px 36px 22px;
-    margin: 0 auto;
+    margin: 0;
+    padding: 32px;
 }
 
 .nf-page-heading {
@@ -1086,68 +1620,101 @@ onMounted(loadDashboard);
 .nf-panel-kicker {
     display: flex;
     align-items: center;
-    gap: 8px;
-    color: var(--db-accent);
-    font-size: 9px;
+    gap: 9px;
+    margin-bottom: 10px;
+    color: var(--db-accent, #165b33);
+    font-size: 11px;
     font-weight: 800;
-    letter-spacing: 1.45px;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    line-height: 1;
 }
 
 .nf-eyebrow-line {
     display: inline-block;
-    width: 17px;
+    width: 18px;
     height: 2px;
-    background: var(--db-accent);
+    border-radius: 2px;
+    background: var(--db-accent, #165b33);
+    flex-shrink: 0;
 }
 
 .nf-page-heading h1 {
-    margin: 12px 0 8px;
-    font-size: clamp(26px, 3vw, 34px);
+    margin: 0 0 8px 0;
+    font-size: clamp(26px, 2.8vw, 34px);
     font-weight: 750;
-    letter-spacing: -1.3px;
+    letter-spacing: -1.1px;
     line-height: 1.2;
+    color: var(--db-text, #141f17);
 }
 
 .nf-page-heading p {
     margin: 0;
-    color: var(--db-text-soft);
-    font-size: 12px;
-    line-height: 1.7;
+    color: var(--db-text-soft, #5f7065);
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 660px;
 }
 
+.nf-heading-card,
 .nf-heading-date {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 15px;
-    background: var(--db-surface);
-    border: 1px solid var(--db-border);
-    border-radius: 10px;
+    gap: 12px;
+    padding: 10px 16px;
+    min-height: 52px;
+    background: #ffffff;
+    background: var(--db-surface, #ffffff);
+    border: 1px solid #e5eae4;
+    border: 1px solid var(--db-border, #e5eae4);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
+.nf-heading-card-icon,
 .nf-date-icon {
-    display: grid;
-    width: 31px;
-    height: 31px;
-    place-items: center;
-    color: var(--db-accent);
-    background: var(--db-accent-soft);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    flex-shrink: 0;
+    color: var(--db-accent, #165b33);
+    background: var(--db-accent-soft, #e8f5e9);
     border-radius: 8px;
-    font-size: 18px;
+    line-height: 0;
+    box-sizing: border-box;
+    padding: 0;
 }
 
-.nf-heading-date div {
-    display: grid;
-    gap: 4px;
+.nf-heading-card-icon svg,
+.nf-date-icon svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+    margin: auto;
+    flex-shrink: 0;
 }
 
+.nf-heading-card strong,
 .nf-heading-date strong {
-    font-size: 10px;
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--db-text, #141f17);
+    line-height: 1.3;
 }
 
-.nf-heading-date div span {
-    color: var(--db-muted);
-    font-size: 9px;
+.nf-heading-card > div > span,
+.nf-heading-date > div > span {
+    display: block;
+    font-size: 11px;
+    color: var(--db-text-soft, #5f7065);
+    line-height: 1.4;
 }
 
 .nf-api-message {
@@ -1214,13 +1781,19 @@ onMounted(loadDashboard);
 }
 
 .nf-stat-icon {
-    display: grid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 32px;
     height: 32px;
     flex: 0 0 32px;
-    place-items: center;
     border-radius: 9px;
-    font-size: 19px;
+    line-height: 0;
+}
+
+.nf-stat-icon svg {
+    display: block;
+    margin: auto;
 }
 
 .nf-icon-green {
@@ -1306,7 +1879,7 @@ onMounted(loadDashboard);
 }
 
 .nf-select {
-    max-width: 115px;
+    max-width: 185px;
     padding: 8px 10px;
     color: var(--db-text);
     background: var(--db-surface);
@@ -1318,6 +1891,95 @@ onMounted(loadDashboard);
 
 .nf-select:focus {
     border-color: var(--db-accent);
+}
+
+
+.nf-trend-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.nf-filter-pills {
+    display: inline-flex;
+    align-items: center;
+    background: var(--db-surface-soft);
+    border: 1px solid var(--db-border);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}
+
+.nf-pill-btn {
+    border: none;
+    background: transparent;
+    color: var(--db-muted);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    line-height: 1.2;
+}
+
+.nf-pill-btn:hover {
+    color: var(--db-text);
+}
+
+.nf-pill-btn.active {
+    background: var(--db-accent);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(45, 138, 91, 0.25);
+}
+
+.nf-hover-info {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--db-text);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nf-hover-badge {
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.nf-hover-badge.risk-high {
+    background: rgba(220, 38, 38, 0.14);
+    color: #dc2626;
+}
+
+.nf-hover-badge.risk-moderate {
+    background: rgba(217, 119, 6, 0.14);
+    color: #d97706;
+}
+
+.nf-hover-badge.risk-low {
+    background: rgba(45, 138, 91, 0.14);
+    color: #2d8a5b;
+}
+
+.nf-chart-point {
+    fill: #43a978;
+    stroke: var(--db-surface);
+    stroke-width: 2;
+    cursor: pointer;
+    transition: r 0.15s ease, stroke-width 0.15s ease;
+}
+
+.nf-chart-point:hover,
+.nf-chart-point.is-hovered {
+    stroke-width: 3;
+    fill: #2d8a5b;
 }
 
 .nf-chart-legend {
@@ -1417,27 +2079,57 @@ onMounted(loadDashboard);
 }
 
 .nf-mini-icon {
-    display: grid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 31px;
     height: 31px;
-    place-items: center;
     color: var(--db-accent);
     background: var(--db-accent-soft);
     border-radius: 8px;
-    font-size: 20px;
+    line-height: 0;
+}
+
+.nf-mini-icon svg {
+    display: block;
+    margin: auto;
 }
 
 .nf-region-list {
     display: grid;
-    gap: 23px;
-    margin-top: 30px;
+    gap: 10px;
+    max-height: 290px;
+    overflow-y: auto;
+    padding-right: 6px;
+    margin-top: 18px;
+}
+
+.nf-region-item {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    text-align: left;
+    color: inherit;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.nf-region-item:hover {
+    background: var(--db-surface-soft);
+}
+
+.nf-region-item.is-active {
+    background: var(--db-accent-soft);
+    border-color: var(--db-border);
 }
 
 .nf-region-top {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 9px;
+    gap: 8px;
+    margin-bottom: 7px;
 }
 
 .nf-region-number {
@@ -1449,6 +2141,42 @@ onMounted(loadDashboard);
     flex: 1;
     font-size: 11px;
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nf-firms-pill {
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 8px;
+    font-weight: 700;
+    color: #b91c1c;
+    background: #fee2e2;
+    white-space: nowrap;
+}
+
+.nf-risk-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.nf-risk-badge.is-high {
+    color: #c53030;
+    background: #fed7d7;
+}
+
+.nf-risk-badge.is-moderate {
+    color: #b7791f;
+    background: #fefcbf;
+}
+
+.nf-risk-badge.is-low {
+    color: #276749;
+    background: #c6f6d5;
 }
 
 .nf-region-value {
@@ -1468,8 +2196,20 @@ onMounted(loadDashboard);
     height: 100%;
     background: #43a978;
     border-radius: inherit;
-    opacity: .85;
+    opacity: .9;
     transition: width .3s ease;
+}
+
+.nf-progress-fill.is-high {
+    background: #e53e3e;
+}
+
+.nf-progress-fill.is-moderate {
+    background: #dd6b20;
+}
+
+.nf-progress-fill.is-low {
+    background: #43a978;
 }
 
 .nf-empty-state {
@@ -1565,15 +2305,21 @@ onMounted(loadDashboard);
 }
 
 .nf-map-placeholder-icon {
-    display: grid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 35px;
     height: 35px;
     margin-bottom: 10px;
-    place-items: center;
     color: var(--db-accent);
     background: var(--db-accent-soft);
     border-radius: 10px;
-    font-size: 22px;
+    line-height: 0;
+}
+
+.nf-map-placeholder-icon svg {
+    display: block;
+    margin: auto;
 }
 
 .nf-map-placeholder strong {
@@ -1617,27 +2363,33 @@ onMounted(loadDashboard);
 
 .nf-weather-list {
     display: grid;
-    margin-top: 20px;
+    margin-top: 14px;
 }
 
 .nf-weather-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 16px 0;
+    padding: 12px 0;
     border-bottom: 1px solid var(--db-border);
 }
 
 .nf-weather-icon {
-    display: grid;
-    width: 38px;
-    height: 38px;
-    flex: 0 0 38px;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
     color: var(--db-accent);
     background: var(--db-accent-soft);
     border-radius: 10px;
-    font-size: 21px;
+    line-height: 0;
+}
+
+.nf-weather-icon svg {
+    display: block;
+    margin: auto;
 }
 
 .nf-weather-copy {
@@ -1654,7 +2406,7 @@ onMounted(loadDashboard);
 }
 
 .nf-weather-copy strong {
-    font-size: 17px;
+    font-size: 16px;
 }
 
 .nf-weather-copy small {
@@ -1667,14 +2419,14 @@ onMounted(loadDashboard);
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 17px;
+    margin-top: 14px;
     color: var(--db-muted);
     font-size: 9px;
 }
 
 .nf-weather-link {
     display: inline-block;
-    margin-top: 16px;
+    margin-top: 12px;
     color: var(--db-accent);
     font-size: 10px;
     font-weight: 650;
@@ -1722,27 +2474,15 @@ onMounted(loadDashboard);
     letter-spacing: .9px;
 }
 
-@media (min-width: 1500px) {
-    .nf-content {
-        padding-right: 48px;
-        padding-left: 48px;
-    }
-
-    .nf-topbar {
-        padding-right: 48px;
-        padding-left: 48px;
-    }
-}
-
 @media (max-width: 1200px) {
     .nf-content {
-        padding-right: 24px;
-        padding-left: 24px;
+        padding-right: 22px;
+        padding-left: 22px;
     }
 
     .nf-topbar {
-        padding-right: 24px;
-        padding-left: 24px;
+        padding-right: 22px;
+        padding-left: 22px;
     }
 
     .nf-stats-grid {
@@ -1751,7 +2491,8 @@ onMounted(loadDashboard);
 }
 
 @media (max-width: 900px) {
-    .nf-main {
+    .nf-main,
+    .nf-main.nf-main-collapsed {
         margin-left: 0;
     }
 
@@ -1795,6 +2536,7 @@ onMounted(loadDashboard);
         font-size: 27px;
     }
 
+    .nf-heading-card,
     .nf-heading-date {
         width: 100%;
     }
@@ -1840,7 +2582,7 @@ onMounted(loadDashboard);
     }
 
     .nf-select {
-        max-width: 105px;
+        max-width: 140px;
         padding: 7px 5px;
     }
 

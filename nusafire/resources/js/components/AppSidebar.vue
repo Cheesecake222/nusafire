@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
@@ -30,27 +29,27 @@ const currentUrl = computed(() => page.url.split('?')[0]);
 const navigationItems = [
     {
         label: 'Overview',
-        description: 'Ringkasan dashboard',
+        description: 'Early warning summary',
         href: '/dashboard',
         icon: 'overview',
     },
     {
         label: 'Hotspot Map',
-        description: 'Peta titik panas',
+        description: 'Satellite hotspot observation',
         href: '/hotspot-map',
         icon: 'map',
     },
     {
         label: 'Weather Analysis',
-        description: 'Analisis cuaca',
+        description: 'Open-Meteo weather parameters',
         href: '/weather-analysis',
         icon: 'weather',
     },
     {
-        label: 'Burned Area',
-        description: 'Area terbakar',
-        href: '/burned-area',
-        icon: 'area',
+        label: 'AI Prediction',
+        description: 'Data fusion & risk forecast',
+        href: '/ai-prediction',
+        icon: 'ai',
     },
 ];
 
@@ -60,7 +59,7 @@ const isActive = (href: string) => {
 };
 
 const userInitials = computed(() => {
-    const name = authUser.value?.name?.trim() || 'Pengguna';
+    const name = authUser.value?.name?.trim() || 'User';
 
     return name
         .split(/\s+/)
@@ -163,7 +162,7 @@ function saveAccount() {
             accountForm.reset('current_password', 'password', 'password_confirmation');
 
             notify(
-                'Perubahan akun berhasil disimpan.',
+                'Account changes saved successfully.',
                 'success',
             );
         },
@@ -173,8 +172,8 @@ function saveAccount() {
 
             notify(
                 hasValidationErrors
-                    ? 'Periksa kembali nama dan alamat email.'
-                    : 'Perubahan akun gagal disimpan. Silakan coba lagi.',
+                    ? 'Please check your name and email address.'
+                    : 'Failed to save account changes. Please try again.',
                 'error',
             );
         },
@@ -194,6 +193,21 @@ function logout() {
         },
     });
 }
+
+function handleCollapseToggle() {
+    if (window.innerWidth <= 900) {
+        // Mobile: tutup overlay sidebar
+        emit('close');
+    } else {
+        // Desktop: toggle collapse (emit update:collapsed)
+        const next = !props.collapsed;
+        emit('update:collapsed', next);
+        localStorage.setItem('nf-sidebar-collapsed', String(next));
+    }
+}
+
+
+
 
 function handleEscape(event: KeyboardEvent) {
     if (event.key === 'Escape' && showAccountPopup.value) {
@@ -216,18 +230,18 @@ onBeforeUnmount(() => {
 
 <template>
     <div>
-        <!-- Overlay untuk sidebar mobile -->
+        <!-- Overlay for mobile sidebar -->
         <Transition name="nf-sidebar-overlay">
             <button
                 v-if="mobileOpen"
                 type="button"
                 class="nf-sidebar-backdrop"
-                aria-label="Tutup navigasi"
+                aria-label="Close navigation"
                 @click="emit('close')"
             />
         </Transition>
 
-        <!-- Sidebar utama -->
+        <!-- Main sidebar -->
         <aside
             class="nf-sidebar"
             :class="{
@@ -244,33 +258,24 @@ onBeforeUnmount(() => {
                     aria-label="NusaFire Overview"
                 >
                     <div class="nf-brand-mark">
-                        <svg
-                            viewBox="0 0 40 40"
-                            fill="none"
-                            aria-hidden="true"
-                        >
-                            <path
-                                d="M21.5 4.5C23 11 17 13.5 17 19.5C17 22 18.5 24 21 25C20 21.5 23.5 18.5 25.5 16C30 21 32 24.5 32 29C32 35 26.5 38 20 38C12 38 7 33 7 26.5C7 20 11.5 15 15.5 11.5C15 17 16 19 17.5 20.5C17 13 20 9 21.5 4.5Z"
-                                fill="currentColor"
-                            />
-                            <path
-                                d="M20 30C22.5 27.5 24 25 24 22.5C28 26.5 28 29 26.5 31.5C25 34 21.5 34.5 19 33C17 31.5 17 29.5 18 28C18.5 29 19 29.5 20 30Z"
-                                fill="#D6F2DF"
-                            />
-                        </svg>
+                        <img
+                            src="/logo.png"
+                            alt="NusaFire Logo"
+                            class="nf-brand-img"
+                        />
                     </div>
 
                     <div class="nf-brand-copy">
                         <strong>NusaFire</strong>
-                        <span>FOREST MONITORING</span>
+                        <span>FIRE EARLY WARNING</span>
                     </div>
                 </Link>
 
                 <button
                     type="button"
                     class="nf-sidebar-close"
-                    aria-label="Tutup sidebar"
-                    @click="emit('close')"
+                    :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                    @click="handleCollapseToggle"
                 >
                     <svg
                         viewBox="0 0 24 24"
@@ -278,6 +283,8 @@ onBeforeUnmount(() => {
                         stroke="currentColor"
                         stroke-width="1.8"
                         aria-hidden="true"
+                        style="transition: transform .25s ease"
+                        :style="collapsed ? 'transform: rotate(180deg)' : ''"
                     >
                         <path
                             d="M15 18l-6-6 6-6"
@@ -294,7 +301,7 @@ onBeforeUnmount(() => {
                     <span>NAVIGATION</span>
                 </div>
 
-                <nav class="nf-sidebar-nav" aria-label="Navigasi utama">
+                <nav class="nf-sidebar-nav" aria-label="Main navigation">
                     <Link
                         v-for="item in navigationItems"
                         :key="item.href"
@@ -346,9 +353,26 @@ onBeforeUnmount(() => {
                             >
                                 <circle cx="12" cy="12" r="4" />
                                 <path
-                                    d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3l1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3l1.42-1.42"
+                                    d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"
                                     stroke-linecap="round"
                                 />
+                            </svg>
+
+                            <svg
+                                v-else-if="item.icon === 'ai'"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    d="M12 2a5 5 0 0 0-5 5v1a3 3 0 0 0-3 3v2a3 3 0 0 0 3 3v1a5 5 0 0 0 10 0v-1a3 3 0 0 0 3-3v-2a3 3 0 0 0-3-3V7a5 5 0 0 0-5-5z"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                />
+                                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                                <path d="M9 12h6m-3-3v6" stroke-linecap="round" />
                             </svg>
 
                             <svg
@@ -359,11 +383,7 @@ onBeforeUnmount(() => {
                                 stroke-width="1.7"
                                 aria-hidden="true"
                             >
-                                <path
-                                    d="M4 20h16M6 20V9l6-5 6 5v11M9 20v-6h6v6"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                />
+                                <circle cx="12" cy="12" r="4" />
                             </svg>
                         </span>
 
@@ -379,14 +399,19 @@ onBeforeUnmount(() => {
                     </Link>
                 </nav>
 
-                <!-- Informasi sistem -->
-                <div class="nf-sidebar-note">
+                <!-- Forest Watch Link to Dedicated Page -->
+                <Link
+                    href="/forest-watch"
+                    class="nf-sidebar-note"
+                    :class="{ 'is-active': isActive('/forest-watch') }"
+                    aria-label="Forest Watch Project Architecture"
+                >
                     <div class="nf-note-icon">
                         <svg
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
-                            stroke-width="1.7"
+                            stroke-width="1.8"
                             aria-hidden="true"
                         >
                             <path
@@ -403,21 +428,21 @@ onBeforeUnmount(() => {
 
                     <div class="nf-note-copy">
                         <strong>Forest Watch</strong>
-                        <span>Monitoring kebakaran hutan</span>
+                        <span>Project specs &amp; AI architecture</span>
                         <span class="nf-system-status">
                             <i />
                             System active
                         </span>
                     </div>
-                </div>
+                </Link>
             </div>
 
-            <!-- Footer akun -->
+            <!-- Footer account -->
             <div class="nf-sidebar-footer">
                 <button
                     type="button"
                     class="nf-user-card"
-                    :title="collapsed ? (authUser?.name ?? 'Akun') : undefined"
+                    :title="collapsed ? (authUser?.name ?? 'Account') : undefined"
                     @click="openAccountPopup"
                 >
                     <div class="nf-user-avatar">
@@ -425,8 +450,8 @@ onBeforeUnmount(() => {
                     </div>
 
                     <div class="nf-user-copy">
-                        <strong>{{ authUser?.name ?? 'Pengguna' }}</strong>
-                        <span>{{ authUser?.email ?? 'Email tidak tersedia' }}</span>
+                        <strong>{{ authUser?.name ?? 'User' }}</strong>
+                        <span>{{ authUser?.email ?? 'Email unavailable' }}</span>
                     </div>
 
                     <svg
@@ -466,18 +491,18 @@ onBeforeUnmount(() => {
                     </svg>
 
                     <span>
-                        {{ isLoggingOut ? 'Keluar...' : 'Keluar dari akun' }}
+                        {{ isLoggingOut ? 'Logging out...' : 'Log out' }}
                     </span>
                 </button>
 
                 <div class="nf-sidebar-copyright">
                     <span>NUSAFIRE</span>
-                    <span>Environmental Monitoring Platform</span>
+                    <span>Early Warning Intelligence</span>
                 </div>
             </div>
         </aside>
 
-        <!-- Popup akun: tetap pada popup yang sama saat edit -->
+        <!-- Account popup -->
         <Teleport to="body">
             <Transition name="nf-account-transition">
                 <div
@@ -500,16 +525,16 @@ onBeforeUnmount(() => {
                                 <h2 id="nf-account-title">
                                     {{
                                         isEditingAccount
-                                            ? 'Edit akun'
-                                            : 'Informasi akun'
+                                            ? 'Edit profile'
+                                            : 'Account details'
                                     }}
                                 </h2>
 
                                 <p>
                                     {{
                                         isEditingAccount
-                                            ? 'Perbarui informasi akun kamu melalui formulir berikut.'
-                                            : 'Kelola informasi akun yang kamu gunakan untuk mengakses NusaFire.'
+                                            ? 'Update your account information using the form below.'
+                                            : 'Manage the account information used to access NusaFire.'
                                     }}
                                 </p>
                             </div>
@@ -517,7 +542,7 @@ onBeforeUnmount(() => {
                             <button
                                 type="button"
                                 class="nf-account-close"
-                                aria-label="Tutup popup"
+                                aria-label="Close modal"
                                 :disabled="accountForm.processing"
                                 @click="closeAccountPopup"
                             >
@@ -534,8 +559,8 @@ onBeforeUnmount(() => {
                                 <strong>
                                     {{
                                         isEditingAccount
-                                            ? accountForm.name || 'Nama pengguna'
-                                            : authUser?.name ?? 'Pengguna'
+                                            ? accountForm.name || 'User name'
+                                            : authUser?.name ?? 'User'
                                     }}
                                 </strong>
 
@@ -549,12 +574,12 @@ onBeforeUnmount(() => {
 
                                 <span class="nf-account-status">
                                     <i />
-                                    Akun aktif
+                                    Active account
                                 </span>
                             </div>
                         </div>
 
-                        <!-- Mode edit -->
+                        <!-- Edit mode -->
                         <form
                             v-if="isEditingAccount"
                             class="nf-account-form"
@@ -562,7 +587,7 @@ onBeforeUnmount(() => {
                         >
                             <div class="nf-account-field">
                                 <label for="nf-account-name">
-                                    Nama lengkap
+                                    Full name
                                 </label>
 
                                 <input
@@ -571,7 +596,7 @@ onBeforeUnmount(() => {
                                     type="text"
                                     name="name"
                                     autocomplete="name"
-                                    placeholder="Masukkan nama lengkap"
+                                    placeholder="Enter your full name"
                                     maxlength="255"
                                     required
                                     :disabled="accountForm.processing"
@@ -587,7 +612,7 @@ onBeforeUnmount(() => {
 
                             <div class="nf-account-field">
                                 <label for="nf-account-email">
-                                    Alamat email
+                                    Email address
                                 </label>
 
                                 <input
@@ -596,7 +621,7 @@ onBeforeUnmount(() => {
                                     type="email"
                                     name="email"
                                     autocomplete="email"
-                                    placeholder="nama@email.com"
+                                    placeholder="name@email.com"
                                     maxlength="255"
                                     required
                                     :disabled="accountForm.processing"
@@ -612,19 +637,19 @@ onBeforeUnmount(() => {
 
                             <div class="nf-account-password-section">
                                 <div class="nf-account-password-heading">
-                                    <strong>Ganti password</strong>
-                                    <span>Kosongkan bagian ini jika tidak ingin mengganti password.</span>
+                                    <strong>Change password</strong>
+                                    <span>Leave blank if you do not want to change your password.</span>
                                 </div>
 
                                 <div class="nf-account-field">
-                                    <label for="nf-account-current-password">Password saat ini</label>
+                                    <label for="nf-account-current-password">Current password</label>
                                     <input
                                         id="nf-account-current-password"
                                         v-model="accountForm.current_password"
                                         type="password"
                                         name="current_password"
                                         autocomplete="current-password"
-                                        placeholder="Masukkan password saat ini"
+                                        placeholder="Enter current password"
                                         :disabled="accountForm.processing"
                                     />
                                     <span v-if="accountForm.errors.current_password" class="nf-account-error">
@@ -633,14 +658,14 @@ onBeforeUnmount(() => {
                                 </div>
 
                                 <div class="nf-account-field">
-                                    <label for="nf-account-new-password">Password baru</label>
+                                    <label for="nf-account-new-password">New password</label>
                                     <input
                                         id="nf-account-new-password"
                                         v-model="accountForm.password"
                                         type="password"
                                         name="password"
                                         autocomplete="new-password"
-                                        placeholder="Minimal 8 karakter"
+                                        placeholder="At least 8 characters"
                                         :disabled="accountForm.processing"
                                     />
                                     <span v-if="accountForm.errors.password" class="nf-account-error">
@@ -649,14 +674,14 @@ onBeforeUnmount(() => {
                                 </div>
 
                                 <div class="nf-account-field">
-                                    <label for="nf-account-password-confirmation">Konfirmasi password baru</label>
+                                    <label for="nf-account-password-confirmation">Confirm new password</label>
                                     <input
                                         id="nf-account-password-confirmation"
                                         v-model="accountForm.password_confirmation"
                                         type="password"
                                         name="password_confirmation"
                                         autocomplete="new-password"
-                                        placeholder="Ulangi password baru"
+                                        placeholder="Repeat new password"
                                         :disabled="accountForm.processing"
                                     />
                                 </div>
@@ -678,8 +703,7 @@ onBeforeUnmount(() => {
                                 </svg>
 
                                 <span>
-                                    Perubahan akan disimpan ke akun kamu setelah
-                                    proses penyimpanan berhasil.
+                                    Changes will be applied to your account after saving.
                                 </span>
                             </div>
 
@@ -690,7 +714,7 @@ onBeforeUnmount(() => {
                                     :disabled="accountForm.processing"
                                     @click="cancelEditAccount"
                                 >
-                                    Batal
+                                    Cancel
                                 </button>
 
                                 <button
@@ -723,24 +747,24 @@ onBeforeUnmount(() => {
 
                                     {{
                                         accountForm.processing
-                                            ? 'Menyimpan...'
-                                            : 'Simpan perubahan'
+                                            ? 'Saving...'
+                                            : 'Save changes'
                                     }}
                                 </button>
                             </footer>
                         </form>
 
-                        <!-- Mode informasi akun -->
+                        <!-- Account details mode -->
                         <div v-else class="nf-account-details">
                             <div class="nf-account-detail">
-                                <span>Nama lengkap</span>
+                                <span>Full name</span>
                                 <strong>
                                     {{ authUser?.name ?? '-' }}
                                 </strong>
                             </div>
 
                             <div class="nf-account-detail">
-                                <span>Alamat email</span>
+                                <span>Email address</span>
                                 <strong>
                                     {{ authUser?.email ?? '-' }}
                                 </strong>
@@ -752,7 +776,7 @@ onBeforeUnmount(() => {
                                     class="nf-account-button nf-account-button-secondary"
                                     @click="closeAccountPopup"
                                 >
-                                    Tutup
+                                    Close
                                 </button>
 
                                 <button
@@ -774,7 +798,7 @@ onBeforeUnmount(() => {
                                         />
                                     </svg>
 
-                                    Edit akun
+                                    Edit profile
                                 </button>
                             </footer>
                         </div>
@@ -782,7 +806,7 @@ onBeforeUnmount(() => {
                 </div>
             </Transition>
 
-            <!-- Notifikasi sementara -->
+            <!-- Temporary notification toast -->
             <Transition name="nf-toast-transition">
                 <div
                     v-if="showToast"
@@ -814,8 +838,8 @@ onBeforeUnmount(() => {
                         <strong>
                             {{
                                 toastType === 'success'
-                                    ? 'Berhasil'
-                                    : 'Belum berhasil'
+                                    ? 'Success'
+                                    : 'Error'
                             }}
                         </strong>
 
@@ -824,7 +848,7 @@ onBeforeUnmount(() => {
 
                     <button
                         type="button"
-                        aria-label="Tutup notifikasi"
+                        aria-label="Close notification"
                         @click="showToast = false"
                     >
                         &times;
@@ -833,6 +857,9 @@ onBeforeUnmount(() => {
             </Transition>
         </Teleport>
     </div>
+
+        
+
 </template>
 
 <style>
@@ -886,20 +913,31 @@ onBeforeUnmount(() => {
 }
 
 .nf-brand-mark {
-    display: grid;
-    width: 43px;
-    height: 43px;
-    flex: 0 0 43px;
-    place-items: center;
-    color: #ffffff;
-    background: linear-gradient(145deg, #35a86b, #176b43);
-    border-radius: 13px;
-    box-shadow: 0 5px 12px rgb(33 134 83 / 18%);
+    display: flex;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border: 1px solid var(--nf-sidebar-border, #e5eae4);
+    border-radius: 12px;
+    padding: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
 }
 
-.nf-brand-mark svg {
-    width: 27px;
-    height: 27px;
+.theme-dark .nf-brand-mark,
+html.dark .nf-brand-mark {
+    background: #19231c;
+    border-color: #2b3a2e;
+}
+
+.nf-brand-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
 }
 
 .nf-brand-copy {
@@ -1001,13 +1039,15 @@ onBeforeUnmount(() => {
 }
 
 .nf-nav-icon {
-    display: grid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 37px;
     height: 37px;
     flex: 0 0 37px;
-    place-items: center;
     background: rgb(125 145 130 / 8%);
     border-radius: 10px;
+    line-height: 0;
 }
 
 .nf-nav-link-active .nf-nav-icon {
@@ -1019,6 +1059,8 @@ onBeforeUnmount(() => {
 .nf-nav-icon svg {
     width: 19px;
     height: 19px;
+    display: block;
+    margin: auto;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
@@ -1048,6 +1090,30 @@ onBeforeUnmount(() => {
     flex: 0 0 6px;
     background: var(--nf-green);
     border-radius: 50%;
+}
+
+
+.nf-sidebar-note {
+    transition: all 0.2s ease;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.nf-sidebar-note:hover {
+    border-color: #bad3c0;
+    box-shadow: 0 4px 12px rgba(33, 134, 83, 0.08);
+}
+
+.nf-sidebar-note.is-active {
+    background: #eaf5ed;
+    border-color: #218653;
+    box-shadow: 0 4px 12px rgba(33, 134, 83, 0.12);
+}
+
+.theme-dark .nf-sidebar-note.is-active,
+html.dark .nf-sidebar-note.is-active {
+    background: #173824;
+    border-color: #34d399;
 }
 
 .nf-sidebar-note {
@@ -1237,58 +1303,98 @@ onBeforeUnmount(() => {
 }
 
 /* Mode sidebar ringkas */
-.nf-sidebar-collapsed {
+.nf-sidebar.nf-sidebar-collapsed {
     width: 82px;
 }
 
-.nf-sidebar-collapsed .nf-sidebar-brand {
+.nf-sidebar.nf-sidebar-collapsed .nf-sidebar-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    padding: 15px 8px;
+    gap: 8px;
+    padding: 14px 6px 10px;
 }
 
-.nf-sidebar-collapsed .nf-brand-link {
+.nf-sidebar.nf-sidebar-collapsed .nf-brand-link {
     justify-content: center;
 }
 
-.nf-sidebar-collapsed .nf-brand-copy,
-.nf-sidebar-collapsed .nf-sidebar-close,
-.nf-sidebar-collapsed .nf-nav-heading,
-.nf-sidebar-collapsed .nf-nav-copy,
-.nf-sidebar-collapsed .nf-nav-active-dot,
-.nf-sidebar-collapsed .nf-note-copy,
-.nf-sidebar-collapsed .nf-user-copy,
-.nf-sidebar-collapsed .nf-user-settings-icon,
-.nf-sidebar-collapsed .nf-logout-button span,
-.nf-sidebar-collapsed .nf-sidebar-copyright {
+.nf-sidebar.nf-sidebar-collapsed .nf-brand-mark {
+    width: 38px;
+    height: 38px;
+}
+
+.nf-sidebar.nf-sidebar-collapsed .nf-brand-copy,
+.nf-sidebar.nf-sidebar-collapsed .nf-nav-heading,
+.nf-sidebar.nf-sidebar-collapsed .nf-nav-copy,
+.nf-sidebar.nf-sidebar-collapsed .nf-nav-active-dot,
+.nf-sidebar.nf-sidebar-collapsed .nf-note-copy,
+.nf-sidebar.nf-sidebar-collapsed .nf-user-copy,
+.nf-sidebar.nf-sidebar-collapsed .nf-user-settings-icon,
+.nf-sidebar.nf-sidebar-collapsed .nf-logout-button span,
+.nf-sidebar.nf-sidebar-collapsed .nf-sidebar-copyright {
     display: none;
 }
 
-.nf-sidebar-collapsed .nf-sidebar-content {
-    padding: 23px 10px;
+/* Saat collapsed: tombol toggle tetap tampil di tengah brand bar di bawah logo */
+.nf-sidebar.nf-sidebar-collapsed .nf-sidebar-close {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    margin: 0 auto;
 }
 
-.nf-sidebar-collapsed .nf-nav-link {
+.nf-sidebar.nf-sidebar-collapsed .nf-sidebar-content {
+    padding: 16px 10px;
+}
+
+.nf-sidebar.nf-sidebar-collapsed .nf-nav-link {
     justify-content: center;
     padding: 8px;
 }
 
-.nf-sidebar-collapsed .nf-nav-icon {
+.nf-sidebar.nf-sidebar-collapsed .nf-nav-icon {
     width: 42px;
     height: 42px;
     flex-basis: 42px;
 }
 
-.nf-sidebar-collapsed .nf-sidebar-note {
+.nf-sidebar.nf-sidebar-collapsed 
+.nf-sidebar-note {
+    transition: all 0.2s ease;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.nf-sidebar-note:hover {
+    border-color: #bad3c0;
+    box-shadow: 0 4px 12px rgba(33, 134, 83, 0.08);
+}
+
+.nf-sidebar-note.is-active {
+    background: #eaf5ed;
+    border-color: #218653;
+    box-shadow: 0 4px 12px rgba(33, 134, 83, 0.12);
+}
+
+.theme-dark .nf-sidebar-note.is-active,
+html.dark .nf-sidebar-note.is-active {
+    background: #173824;
+    border-color: #34d399;
+}
+
+.nf-sidebar-note {
     justify-content: center;
     padding: 10px 5px;
 }
 
-.nf-sidebar-collapsed .nf-user-card {
+.nf-sidebar.nf-sidebar-collapsed .nf-user-card {
     justify-content: center;
     padding: 10px 0 13px;
 }
 
-.nf-sidebar-collapsed .nf-logout-button {
+.nf-sidebar.nf-sidebar-collapsed .nf-logout-button {
     justify-content: center;
     padding: 10px 0;
 }
@@ -1793,44 +1899,86 @@ onBeforeUnmount(() => {
         transform: translateX(-105%);
     }
 
-    .nf-sidebar-collapsed {
+    .nf-sidebar.nf-sidebar-collapsed {
         width: 268px;
     }
 
-    .nf-sidebar-collapsed .nf-brand-copy,
-    .nf-sidebar-collapsed .nf-sidebar-close,
-    .nf-sidebar-collapsed .nf-nav-heading,
-    .nf-sidebar-collapsed .nf-nav-copy,
-    .nf-sidebar-collapsed .nf-nav-active-dot,
-    .nf-sidebar-collapsed .nf-note-copy,
-    .nf-sidebar-collapsed .nf-user-copy,
-    .nf-sidebar-collapsed .nf-user-settings-icon,
-    .nf-sidebar-collapsed .nf-logout-button span,
-    .nf-sidebar-collapsed .nf-sidebar-copyright {
+    .nf-sidebar.nf-sidebar-collapsed .nf-brand-copy,
+    .nf-sidebar.nf-sidebar-collapsed .nf-nav-heading,
+    .nf-sidebar.nf-sidebar-collapsed .nf-nav-copy,
+    .nf-sidebar.nf-sidebar-collapsed .nf-nav-active-dot,
+    .nf-sidebar.nf-sidebar-collapsed .nf-note-copy,
+    .nf-sidebar.nf-sidebar-collapsed .nf-user-copy,
+    .nf-sidebar.nf-sidebar-collapsed .nf-user-settings-icon,
+    .nf-sidebar.nf-sidebar-collapsed .nf-logout-button span,
+    .nf-sidebar.nf-sidebar-collapsed .nf-sidebar-copyright {
         display: revert;
     }
 
-    .nf-sidebar-collapsed .nf-sidebar-brand {
+    /* Di mobile: tombol close kembali ke kanan, bukan tengah */
+    .nf-sidebar.nf-sidebar-collapsed .nf-sidebar-close {
+        display: grid;
+        width: 31px;
+        height: 31px;
+        margin: 0;
+    }
+
+    .nf-sidebar.nf-sidebar-collapsed .nf-sidebar-brand {
+        display: flex;
+        flex-direction: row;
         justify-content: space-between;
         padding: 18px 20px;
     }
 
-    .nf-sidebar-collapsed .nf-nav-link {
+    .nf-sidebar.nf-sidebar-collapsed .nf-brand-mark {
+        width: 43px;
+        height: 43px;
+    }
+
+    .nf-sidebar.nf-sidebar-collapsed .nf-sidebar-content {
+        padding: 23px 18px;
+    }
+
+    .nf-sidebar.nf-sidebar-collapsed .nf-nav-link {
         justify-content: flex-start;
         padding: 10px 11px;
     }
 
-    .nf-sidebar-collapsed .nf-sidebar-note {
+    .nf-sidebar.nf-sidebar-collapsed 
+.nf-sidebar-note {
+    transition: all 0.2s ease;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.nf-sidebar-note:hover {
+    border-color: #bad3c0;
+    box-shadow: 0 4px 12px rgba(33, 134, 83, 0.08);
+}
+
+.nf-sidebar-note.is-active {
+    background: #eaf5ed;
+    border-color: #218653;
+    box-shadow: 0 4px 12px rgba(33, 134, 83, 0.12);
+}
+
+.theme-dark .nf-sidebar-note.is-active,
+html.dark .nf-sidebar-note.is-active {
+    background: #173824;
+    border-color: #34d399;
+}
+
+.nf-sidebar-note {
         justify-content: flex-start;
         padding: 14px 12px;
     }
 
-    .nf-sidebar-collapsed .nf-user-card {
+    .nf-sidebar.nf-sidebar-collapsed .nf-user-card {
         justify-content: flex-start;
         padding: 10px 3px 13px;
     }
 
-    .nf-sidebar-collapsed .nf-logout-button {
+    .nf-sidebar.nf-sidebar-collapsed .nf-logout-button {
         justify-content: flex-start;
         padding: 9px 10px;
     }
