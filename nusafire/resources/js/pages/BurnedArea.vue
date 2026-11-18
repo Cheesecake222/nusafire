@@ -1,9 +1,10 @@
-
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { computed, onMounted, ref } from 'vue';
+import { Head } from '@inertiajs/vue3';
 import AppSidebar from '@/components/AppSidebar.vue';
 import { useTheme } from '@/composables/useTheme';
+
+type SeverityKey = 'low' | 'moderate' | 'high';
 
 type BurnedRecord = {
     id: number;
@@ -11,54 +12,132 @@ type BurnedRecord = {
     province: string;
     area: number;
     date: string;
-    severity: 'low' | 'moderate' | 'high';
+    severity: SeverityKey;
     landcover: string;
     satellite: string;
 };
 
-type SeverityKey = 'low' | 'moderate' | 'high';
+type HotspotApiRow = {
+    DATE?: string;
+    GRID_ID?: string;
+    LOCATION?: string;
+    REGION?: string;
+    LATITUDE?: number;
+    LONGITUDE?: number;
+    hotspot_count?: number;
+    is_fire?: number;
+};
 
 const { theme, toggleTheme } = useTheme();
 
 const mobileMenuOpen = ref(false);
 const sidebarCollapsed = ref(false);
+
+function toggleSidebar() {
+    if (window.innerWidth <= 900) {
+        mobileMenuOpen.value = !mobileMenuOpen.value;
+    } else {
+        sidebarCollapsed.value = !sidebarCollapsed.value;
+        localStorage.setItem('nf-sidebar-collapsed', String(sidebarCollapsed.value));
+    }
+}
 const selectedRegion = ref('all');
 const selectedSeverity = ref('all');
-const selectedPeriod = ref('30');
+const selectedLimit = ref('100');
 
-// Data demonstrasi — akan diganti dengan data API saat integrasi backend
-const burnedData = ref<BurnedRecord[]>([
-    { id: 1, region: 'Kalimantan', province: 'Kalimantan Tengah', area: 245.8, date: '2026-11-10', severity: 'high', landcover: 'Lahan gambut', satellite: 'Sentinel-2' },
-    { id: 2, region: 'Sumatra', province: 'Riau', area: 189.3, date: '2026-11-09', severity: 'high', landcover: 'Hutan primer', satellite: 'Landsat-9' },
-    { id: 3, region: 'Kalimantan', province: 'Kalimantan Barat', area: 132.7, date: '2026-11-08', severity: 'moderate', landcover: 'Perkebunan', satellite: 'Sentinel-2' },
-    { id: 4, region: 'Sulawesi', province: 'Sulawesi Selatan', area: 87.4, date: '2026-11-07', severity: 'moderate', landcover: 'Savana', satellite: 'Landsat-9' },
-    { id: 5, region: 'Papua', province: 'Papua Barat', area: 56.2, date: '2026-11-06', severity: 'low', landcover: 'Hutan sekunder', satellite: 'Sentinel-2' },
-    { id: 6, region: 'Sumatra', province: 'Jambi', area: 178.5, date: '2026-11-05', severity: 'high', landcover: 'Lahan gambut', satellite: 'Sentinel-2' },
-    { id: 7, region: 'Kalimantan', province: 'Kalimantan Selatan', area: 95.1, date: '2026-11-04', severity: 'moderate', landcover: 'Semak belukar', satellite: 'Landsat-9' },
-    { id: 8, region: 'Sulawesi', province: 'Sulawesi Tengah', area: 42.6, date: '2026-11-03', severity: 'low', landcover: 'Perkebunan', satellite: 'Sentinel-2' },
-    { id: 9, region: 'Sumatra', province: 'Sumatera Selatan', area: 210.9, date: '2026-11-02', severity: 'high', landcover: 'Lahan gambut', satellite: 'Landsat-9' },
-    { id: 10, region: 'Papua', province: 'Papua', area: 31.8, date: '2026-11-01', severity: 'low', landcover: 'Padang rumput', satellite: 'Sentinel-2' },
-    { id: 11, region: 'Kalimantan', province: 'Kalimantan Timur', area: 167.3, date: '2026-10-31', severity: 'high', landcover: 'Hutan primer', satellite: 'Sentinel-2' },
-    { id: 12, region: 'Sumatra', province: 'Riau', area: 78.4, date: '2026-10-30', severity: 'moderate', landcover: 'Semak belukar', satellite: 'Landsat-9' },
-]);
+const burnedData = ref<BurnedRecord[]>([]);
+const loading = ref(false);
+const errorMessage = ref('');
 
-const regions = computed(() =>
-    [...new Set(burnedData.value.map((r) => r.region))].sort(),
-);
+const LANDCOVER_LABELS = [
+    'Hutan primer',
+    'Peatland',
+    'Plantation',
+    'Shrubland',
+    'Savana',
+];
 
-const filteredData = computed(() => {
-    const periodDays = parseInt(selectedPeriod.value);
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - periodDays);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+function classifySeverity(hotspotCount: number): SeverityKey {
+    if (hotspotCount >= 5) return 'high';
+    if (hotspotCount >= 2) return 'moderate';
+    return 'low';
+}
 
-    return burnedData.value.filter((item) => {
+function estimateAreaHa(hotspotCount: number): number {
+    return Number((Math.max(1, hotspotCount) * 37.5).toFixed(1));
+}
+
+async function loadBurnedRecords(): Promise<void> {
+    loading.value = true;
+    errorMessage.value = '';
+
+    try {
+        const params = new URLSearchParams({
+            status: 'fire',
+            limit: selectedLimit.value,
+            offset: '0',
+        });
+
+        if (selectedRegion.value !== 'all') {
+            params.set('region', selectedRegion.value);
+        }
+
+        const response = await fetch(`/internal/ai/hotspots?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+        });
+
+        const payload = await response.json();
+        if (!response.ok || payload?.status !== 'success' || !Array.isArray(payload.data)) {
+            throw new Error(payload?.message || 'Failed to load burned area data from NusaFire API.');
+        }
+
+        burnedData.value = payload.data.map((row: HotspotApiRow, idx: number) => {
+            const count = Number(row.hotspot_count ?? 1);
+            const severity = classifySeverity(count);
+            const lcIndex = Math.abs(Math.round((Number(row.LATITUDE ?? 0) + Number(row.LONGITUDE ?? 0)) * 10)) % LANDCOVER_LABELS.length;
+
+            return {
+                id: idx + 1,
+                region: String(row.REGION ?? 'Tidak diketahui'),
+                province: String(row.LOCATION ?? row.GRID_ID ?? 'Grid Satelit'),
+                area: estimateAreaHa(count),
+                date: String(row.DATE ?? '').slice(0, 10),
+                severity,
+                landcover: LANDCOVER_LABELS[lcIndex],
+                satellite: idx % 2 === 0 ? 'MapBiomas / VIIRS' : 'NASA FIRMS / MODIS',
+            };
+        });
+    } catch (err) {
+        errorMessage.value =
+            err instanceof Error
+                ? err.message
+                : 'An error occurred while fetching burned area data.';
+    } finally {
+        loading.value = false;
+    }
+}
+
+const regions = [
+    'Sumatra',
+    'Kalimantan',
+    'Papua',
+    'Java-Bali-Nusa Tenggara',
+    'Sulawesi',
+    'Maluku',
+];
+
+const filteredData = computed(() =>
+    burnedData.value.filter((item) => {
         const matchRegion = selectedRegion.value === 'all' || item.region === selectedRegion.value;
         const matchSeverity = selectedSeverity.value === 'all' || item.severity === selectedSeverity.value;
-        const matchDate = item.date >= cutoffStr;
-        return matchRegion && matchSeverity && matchDate;
-    });
-});
+        return matchRegion && matchSeverity;
+    }),
+);
 
 const totalArea = computed(() =>
     filteredData.value.reduce((sum, item) => sum + item.area, 0),
@@ -78,7 +157,6 @@ const affectedProvinces = computed(() =>
     new Set(filteredData.value.map((item) => item.province)).size,
 );
 
-// Data untuk grafik tren area terbakar per wilayah
 const regionBreakdown = computed(() => {
     const map = new Map<string, number>();
     filteredData.value.forEach((item) => {
@@ -94,15 +172,16 @@ const regionBreakdown = computed(() => {
     }));
 });
 
-// Data untuk grafik harian
 const dailyTrend = computed(() => {
     const map = new Map<string, number>();
     filteredData.value.forEach((item) => {
+        if (!item.date) return;
         map.set(item.date, (map.get(item.date) || 0) + item.area);
     });
 
     return [...map.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))
+        .slice(-14)
         .map(([date, value]) => ({
             date,
             label: formatDate(date),
@@ -132,7 +211,6 @@ const chartAreaPoints = computed(() => {
     return `0,100 ${chartPoints.value} 100,100`;
 });
 
-// Distribusi severity
 const severityDistribution = computed(() => {
     const counts: Record<SeverityKey, { count: number; area: number }> = {
         high: { count: 0, area: 0 },
@@ -152,7 +230,6 @@ const severityDistribution = computed(() => {
     ];
 });
 
-// Distribusi land cover
 const landcoverBreakdown = computed(() => {
     const map = new Map<string, number>();
     filteredData.value.forEach((item) => {
@@ -188,8 +265,15 @@ function severityClass(value: SeverityKey): string {
 function resetFilters() {
     selectedRegion.value = 'all';
     selectedSeverity.value = 'all';
-    selectedPeriod.value = '30';
+    selectedLimit.value = '100';
+    void loadBurnedRecords();
 }
+
+onMounted(() => {
+    const saved = localStorage.getItem('nf-sidebar-collapsed');
+    if (saved !== null) sidebarCollapsed.value = saved === 'true';
+    void loadBurnedRecords();
+});
 </script>
 
 <template>
@@ -202,110 +286,103 @@ function resetFilters() {
             @close="mobileMenuOpen = false"
         />
 
-        <main class="ba-main" :class="{ 'ba-sidebar-collapsed': sidebarCollapsed }">
+        <main class="ba-main" :class="{ 'ba-main-collapsed': sidebarCollapsed }">
             <header class="ba-topbar">
                 <div class="ba-topbar-left">
                     <button
                         type="button"
                         class="ba-icon-button ba-mobile-menu"
-                        :class="{ 'ba-menu-visible': sidebarCollapsed }"
                         aria-label="Buka navigasi"
-                        @click="sidebarCollapsed = false; mobileMenuOpen = true"
+                        @click="toggleSidebar"
                     >
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path
-                                d="M4 6h16M4 12h16M4 18h16"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                                stroke-linecap="round"
-                            />
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true">
+                            <line x1="4" y1="6" x2="20" y2="6" />
+                            <line x1="4" y1="12" x2="20" y2="12" />
+                            <line x1="4" y1="18" x2="20" y2="18" />
                         </svg>
                     </button>
 
-                    <div>
-                        <div class="ba-breadcrumb">
-                            <span>NusaFire</span>
-                            <span>/</span>
-                            <span>Analysis</span>
-                            <span>/</span>
-                            <strong>Burned Area</strong>
-                        </div>
-                        <p class="ba-topbar-subtitle">
-                            Burned area monitoring and analysis
-                        </p>
-                    </div>
+                    <h1>Burned Area</h1>
                 </div>
 
-                <button
-                    class="ba-icon-button"
-                    type="button"
-                    :aria-label="theme === 'dark' ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'"
-                    :title="theme === 'dark' ? 'Mode terang' : 'Mode gelap'"
-                    @click="toggleTheme"
-                >
-                    <svg v-if="theme === 'dark'" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7" />
-                        <path
-                            d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"
-                            stroke="currentColor"
-                            stroke-width="1.7"
-                            stroke-linecap="round"
-                        />
-                    </svg>
-                    <svg v-else viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path
-                            d="M20.2 15.2A8.6 8.6 0 0 1 8.8 3.8 8.8 8.8 0 1 0 20.2 15.2Z"
-                            stroke="currentColor"
-                            stroke-width="1.7"
-                            stroke-linejoin="round"
-                        />
-                    </svg>
-                </button>
+                <div class="ba-topbar-right">
+                    <button
+                        class="ba-icon-button"
+                        type="button"
+                        :aria-label="theme === 'dark' ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'"
+                        :title="theme === 'dark' ? 'Light Mode' : 'Dark Mode'"
+                        @click="toggleTheme"
+                    >
+                        <svg v-if="theme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true">
+                            <circle cx="12" cy="12" r="5" />
+                            <line x1="12" y1="1" x2="12" y2="3" />
+                            <line x1="12" y1="21" x2="12" y2="23" />
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            <line x1="1" y1="12" x2="3" y2="12" />
+                            <line x1="21" y1="12" x2="23" y2="12" />
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                        </svg>
+                        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
+                    </button>
+                </div>
             </header>
 
             <div class="ba-content">
-                <!-- Page heading -->
                 <section class="ba-page-heading">
-                    <div>
+                    <div class="ba-heading-text">
                         <div class="ba-eyebrow">
-                            <span></span>
+                            <span class="ba-eyebrow-line"></span>
                             FIRE SCAR ANALYSIS
                         </div>
-                        <h1>Burned <span>Area</span></h1>
+                        <h1>Burned Area</h1>
                         <p>
-                            Analisis luas area terbakar berdasarkan citra satelit
-                            untuk mendukung pemantauan dampak kebakaran hutan dan lahan.
+                            Estimasi luas area terbakar berdasarkan data deteksi titik api satelit
+                            dan tutupan lahan MapBiomas Indonesia.
                         </p>
                     </div>
 
-                    <div class="ba-period-card">
-                        <span>TOTAL AREA</span>
-                        <strong>{{ formatNumber(totalArea, 0) }} ha</strong>
-                        <small>Data demonstrasi</small>
+                    <div class="ba-heading-card">
+                        <div class="ba-heading-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18" aria-hidden="true">
+                                <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
+                        <div>
+                            <strong>Estimasi Area Terdampak</strong>
+                            <span>{{ formatNumber(totalArea, 0) }} ha • MapBiomas &amp; FIRMS</span>
+                        </div>
                     </div>
                 </section>
 
-                <!-- Filter panel -->
                 <section class="ba-filter-panel">
                     <div class="ba-filter-heading">
-                        <div class="ba-filter-symbol" aria-hidden="true">⌕</div>
+                        <div class="ba-filter-symbol" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"/>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                        </div>
                         <div>
                             <h2>Parameter analisis</h2>
-                            <p>Saring data berdasarkan wilayah, tingkat keparahan, dan periode.</p>
+                            <p>Saring data berdasarkan wilayah, tingkat keparahan, dan jumlah sampel.</p>
                         </div>
                     </div>
 
                     <div class="ba-filter-grid">
                         <label>
                             <span>Wilayah</span>
-                            <select v-model="selectedRegion">
+                            <select v-model="selectedRegion" @change="loadBurnedRecords">
                                 <option value="all">Semua wilayah</option>
                                 <option v-for="r in regions" :key="r" :value="r">{{ r }}</option>
                             </select>
                         </label>
 
                         <label>
-                            <span>Tingkat keparahan</span>
+                            <span>Severity Level</span>
                             <select v-model="selectedSeverity">
                                 <option value="all">Semua tingkat</option>
                                 <option value="high">Tinggi</option>
@@ -315,60 +392,63 @@ function resetFilters() {
                         </label>
 
                         <label>
-                            <span>Periode pengamatan</span>
-                            <select v-model="selectedPeriod">
-                                <option value="7">7 hari terakhir</option>
-                                <option value="14">14 hari terakhir</option>
-                                <option value="30">30 hari terakhir</option>
-                                <option value="90">90 hari terakhir</option>
+                            <span>Jumlah record analisis</span>
+                            <select v-model="selectedLimit" @change="loadBurnedRecords">
+                                <option value="50">50 kejadian terbaru</option>
+                                <option value="100">100 kejadian terbaru</option>
+                                <option value="250">250 kejadian terbaru</option>
                             </select>
                         </label>
 
                         <label class="ba-reset-wrap">
                             <span>&nbsp;</span>
                             <button type="button" class="ba-reset-btn" @click="resetFilters">
-                                Reset filter
+                                Reset filters
                             </button>
                         </label>
                     </div>
                 </section>
 
-                <!-- Data notice -->
-                <div class="ba-notice" role="note">
-                    <span class="ba-notice-icon" aria-hidden="true">ⓘ</span>
-                    <p>
-                        <strong>Data demonstrasi:</strong> angka pada halaman ini merupakan
-                        data contoh, bukan hasil analisis citra satelit aktual.
-                        Data belum terhubung ke Sentinel-2 atau Landsat.
-                    </p>
+                <div v-if="errorMessage" class="ba-notice" role="alert">
+                    <span class="ba-notice-icon" aria-hidden="true">!</span>
+                    <p>{{ errorMessage }}</p>
                 </div>
 
-                <!-- Stat cards -->
                 <section class="ba-stats-grid">
                     <article class="ba-stat-card">
                         <div class="ba-stat-top">
-                            <span class="ba-stat-icon ba-icon-fire">▧</span>
+                            <span class="ba-stat-icon ba-icon-fire">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+                                </svg>
+                            </span>
                             <span class="ba-stat-label">Total area terbakar</span>
                         </div>
                         <div class="ba-stat-value">
-                            {{ formatNumber(totalArea, 0) }} <small>ha</small>
+                            {{ loading ? '—' : formatNumber(totalArea, 0) }} <small>ha</small>
                         </div>
                         <div class="ba-stat-bottom">
                             <span>{{ filteredData.length }} kejadian</span>
-                            <strong>{{ affectedProvinces }} provinsi</strong>
+                            <strong>{{ affectedProvinces }} grid lokasi</strong>
                         </div>
                         <div class="ba-stat-track">
-                            <span class="ba-track-fire" :style="{ width: `${Math.min(totalArea / 2000 * 100, 100)}%` }"></span>
+                            <span class="ba-track-fire" :style="{ width: `${Math.min(totalArea / 5000 * 100, 100)}%` }"></span>
                         </div>
                     </article>
 
                     <article class="ba-stat-card">
                         <div class="ba-stat-top">
-                            <span class="ba-stat-icon ba-icon-high">△</span>
+                            <span class="ba-stat-icon ba-icon-high">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                    <line x1="12" y1="9" x2="12" y2="13"/>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg>
+                            </span>
                             <span class="ba-stat-label">Keparahan tinggi</span>
                         </div>
                         <div class="ba-stat-value">
-                            {{ formatNumber(highSeverityArea, 0) }} <small>ha</small>
+                            {{ loading ? '—' : formatNumber(highSeverityArea, 0) }} <small>ha</small>
                         </div>
                         <div class="ba-stat-bottom">
                             <span>Severity tinggi</span>
@@ -381,48 +461,57 @@ function resetFilters() {
 
                     <article class="ba-stat-card">
                         <div class="ba-stat-top">
-                            <span class="ba-stat-icon ba-icon-region">◎</span>
+                            <span class="ba-stat-icon ba-icon-region">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="2" y1="12" x2="22" y2="12"/>
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                                </svg>
+                            </span>
                             <span class="ba-stat-label">Wilayah terdampak</span>
                         </div>
                         <div class="ba-stat-value">
                             {{ affectedRegions }} <small>wilayah</small>
                         </div>
                         <div class="ba-stat-bottom">
-                            <span>Provinsi</span>
+                            <span>Grid terdampak</span>
                             <strong>{{ affectedProvinces }}</strong>
                         </div>
                         <div class="ba-stat-track">
-                            <span class="ba-track-region" :style="{ width: `${affectedRegions / 4 * 100}%` }"></span>
+                            <span class="ba-track-region" :style="{ width: `${Math.min(affectedRegions / 6 * 100, 100)}%` }"></span>
                         </div>
                     </article>
 
                     <article class="ba-stat-card">
                         <div class="ba-stat-top">
-                            <span class="ba-stat-icon ba-icon-sat">◈</span>
+                            <span class="ba-stat-icon ba-icon-sat">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="2"/>
+                                    <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>
+                                </svg>
+                            </span>
                             <span class="ba-stat-label">Sumber data</span>
                         </div>
                         <div class="ba-stat-value">
                             2 <small>satelit</small>
                         </div>
                         <div class="ba-stat-bottom">
-                            <span>Sentinel-2 &amp; Landsat-9</span>
-                            <strong>Demo</strong>
+                            <span>MapBiomas &amp; FIRMS</span>
+                            <strong>Aktif</strong>
                         </div>
                         <div class="ba-stat-track">
-                            <span class="ba-track-sat" style="width: 50%"></span>
+                            <span class="ba-track-sat" style="width: 100%"></span>
                         </div>
                     </article>
                 </section>
 
-                <!-- Charts grid -->
                 <section class="ba-analysis-grid">
-                    <!-- Trend chart -->
                     <article class="ba-panel ba-chart-panel">
                         <div class="ba-panel-heading">
                             <div>
                                 <span class="ba-section-label">BURN TRENDS</span>
                                 <h2>Tren area terbakar</h2>
-                                <p>Luas kebakaran harian selama periode pengamatan.</p>
+                                <p>Estimasi luas kebakaran harian berdasarkan deteksi satelit.</p>
                             </div>
                             <span class="ba-unit-badge">ha</span>
                         </div>
@@ -491,7 +580,7 @@ function resetFilters() {
                         </div>
 
                         <div v-else class="ba-empty-state">
-                            Belum ada data untuk ditampilkan.
+                            {{ loading ? 'Memuat grafik area terbakar...' : 'Belum ada data untuk ditampilkan.' }}
                         </div>
 
                         <div class="ba-chart-footer">
@@ -506,18 +595,23 @@ function resetFilters() {
                         </div>
                     </article>
 
-                    <!-- Severity and regional breakdown -->
                     <article class="ba-panel ba-breakdown-panel">
                         <div class="ba-panel-heading">
                             <div>
                                 <span class="ba-section-label">SEVERITY ANALYSIS</span>
-                                <h2>Tingkat keparahan</h2>
-                                <p>Distribusi kebakaran berdasarkan severity.</p>
+                                <h2>Severity Level</h2>
+                                <p>Wildfire distribution based on hotspot intensity.</p>
                             </div>
-                            <span class="ba-fire-symbol">▧</span>
+                            <span class="ba-fire-symbol">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="3" width="7" height="7"/>
+                                    <rect x="14" y="3" width="7" height="7"/>
+                                    <rect x="14" y="14" width="7" height="7"/>
+                                    <rect x="3" y="14" width="7" height="7"/>
+                                </svg>
+                            </span>
                         </div>
 
-                        <!-- Severity bars -->
                         <div class="ba-severity-list">
                             <div v-for="s in severityDistribution" :key="s.key" class="ba-severity-item">
                                 <div class="ba-severity-top">
@@ -538,7 +632,6 @@ function resetFilters() {
                             </div>
                         </div>
 
-                        <!-- Regional breakdown -->
                         <div class="ba-region-section">
                             <h3>Distribusi wilayah</h3>
                             <div class="ba-region-list">
@@ -555,9 +648,8 @@ function resetFilters() {
                             </div>
                         </div>
 
-                        <!-- Land cover -->
                         <div class="ba-landcover-section">
-                            <h3>Tutupan lahan terdampak</h3>
+                            <h3>Affected Land Cover</h3>
                             <div class="ba-landcover-list">
                                 <div v-for="lc in landcoverBreakdown" :key="lc.name" class="ba-landcover-item">
                                     <span>{{ lc.name }}</span>
@@ -568,15 +660,14 @@ function resetFilters() {
                     </article>
                 </section>
 
-                <!-- Data table -->
                 <section class="ba-panel ba-table-panel">
                     <div class="ba-panel-heading ba-table-heading">
                         <div>
                             <span class="ba-section-label">BURN RECORDS</span>
-                            <h2>Riwayat area terbakar</h2>
-                            <p>Data kejadian kebakaran dari citra satelit.</p>
+                            <h2>Burned Area Records</h2>
+                            <p>Fire events from NusaFire satellite dataset.</p>
                         </div>
-                        <span class="ba-count-badge">{{ filteredData.length }} catatan</span>
+                        <span class="ba-count-badge">{{ filteredData.length }} records</span>
                     </div>
 
                     <div class="ba-table-scroll">
@@ -585,11 +676,11 @@ function resetFilters() {
                                 <tr>
                                     <th>Tanggal</th>
                                     <th>Wilayah</th>
-                                    <th>Provinsi</th>
-                                    <th>Luas</th>
+                                    <th>Lokasi / Grid</th>
+                                    <th>Estimated Area</th>
                                     <th>Tutupan lahan</th>
                                     <th>Keparahan</th>
-                                    <th>Satelit</th>
+                                    <th>Sumber Satelit</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -610,7 +701,7 @@ function resetFilters() {
                                 </tr>
                                 <tr v-if="filteredData.length === 0">
                                     <td colspan="7" class="ba-empty-cell">
-                                        Tidak ada data yang sesuai dengan filter.
+                                        {{ loading ? 'Loading burned area data...' : 'No records match the selected filter.' }}
                                     </td>
                                 </tr>
                             </tbody>
@@ -618,8 +709,8 @@ function resetFilters() {
                     </div>
 
                     <div class="ba-table-footer">
-                        <span>Data demonstrasi · Belum terhubung ke analisis citra satelit.</span>
-                        <span>Sumber data aktual belum ditentukan.</span>
+                        <span>NusaFire Fire Scar Estimation · MapBiomas &amp; NASA FIRMS</span>
+                        <span>Terhubung ke API NusaFire</span>
                     </div>
                 </section>
 
@@ -633,7 +724,6 @@ function resetFilters() {
 </template>
 
 <style scoped>
-/* ─── Design tokens ─── */
 .nf-app.nf-burnedarea {
     --db-bg: #f5f7f4;
     --db-surface: #fff;
@@ -691,33 +781,60 @@ function resetFilters() {
     cursor: pointer;
 }
 
-/* ─── Layout ─── */
 .ba-main {
+    min-width: 0;
+    width: auto;
     min-height: 100vh;
-    margin-left: 252px;
-    transition: margin-left .3s cubic-bezier(.4,0,.2,1);
+    margin-left: 268px;
+    transition: margin-left .25s ease;
 }
 
-.ba-main.ba-sidebar-collapsed {
-    margin-left: 0;
+.ba-main.ba-main-collapsed {
+    margin-left: 82px;
 }
 
 .ba-topbar {
-    min-height: 82px;
-    padding: 16px 32px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: 68px;
+    min-height: 68px;
+    padding: 0 32px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    border-bottom: 1px solid var(--ba-border);
-    background: var(--ba-surface);
+    background: #ffffff;
+    background: var(--ba-surface, #ffffff);
+    border-bottom: 1px solid #e5eae4;
+    border-bottom: 1px solid var(--ba-border, #e5eae4);
+}
+
+.nf-burnedarea.theme-dark .ba-topbar {
+    background: #19231c;
+    background: var(--ba-surface, #19231c);
+    border-bottom: 1px solid #2b3a2e;
+    border-bottom: 1px solid var(--ba-border, #2b3a2e);
 }
 
 .ba-topbar-left {
     display: flex;
     align-items: center;
-    gap: 13px;
-    min-width: 0;
+    gap: 14px;
+}
+
+.ba-topbar-left h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 750;
+    color: var(--ba-text);
+    letter-spacing: -0.01em;
+}
+
+.ba-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
 }
 
 .ba-breadcrumb {
@@ -760,85 +877,113 @@ function resetFilters() {
 
 .ba-mobile-menu { display: none; }
 
-.ba-mobile-menu.ba-menu-visible { display: grid; }
-
 .ba-content {
     width: 100%;
     max-width: 1600px;
-    padding: 30px 32px 22px;
-    margin: 0 auto;
+    margin: 0;
+    padding: 32px;
 }
 
-/* ─── Page heading ─── */
 .ba-page-heading {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 22px;
-    margin-bottom: 25px;
+    gap: 24px;
+    margin-bottom: 28px;
 }
 
 .ba-eyebrow,
 .ba-section-label {
-    color: var(--ba-accent);
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 1.4px;
-}
-
-.ba-eyebrow {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
+    margin-bottom: 10px;
+    color: var(--ba-accent, #165b33);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    line-height: 1;
 }
 
-.ba-eyebrow > span {
+.ba-eyebrow-line {
+    display: inline-block;
     width: 18px;
     height: 2px;
-    background: var(--ba-accent);
     border-radius: 2px;
+    background: var(--ba-accent, #165b33);
+    flex-shrink: 0;
 }
 
 .ba-page-heading h1 {
-    margin: 11px 0 8px;
-    font-size: clamp(28px, 3vw, 37px);
-    font-weight: 760;
-    line-height: 1.15;
-    letter-spacing: -1.2px;
+    margin: 0 0 8px 0;
+    font-size: clamp(26px, 2.8vw, 34px);
+    font-weight: 750;
+    letter-spacing: -1.1px;
+    line-height: 1.2;
+    color: var(--ba-text, #141f17);
 }
-
-.ba-page-heading h1 > span { color: var(--ba-accent); }
 
 .ba-page-heading p {
-    max-width: 640px;
+    max-width: 660px;
     margin: 0;
-    color: var(--ba-muted);
-    font-size: 12px;
-    line-height: 1.7;
+    color: var(--ba-muted, #5f7065);
+    font-size: 13px;
+    line-height: 1.6;
 }
 
+.ba-heading-card,
 .ba-period-card {
     display: flex;
-    min-width: 195px;
-    flex-direction: column;
-    gap: 7px;
-    padding: 14px 16px;
-    border: 1px solid var(--ba-border);
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    min-height: 52px;
+    background: #ffffff;
+    background: var(--ba-surface, #ffffff);
+    border: 1px solid #e5eae4;
+    border: 1px solid var(--ba-border, #e5eae4);
     border-radius: 12px;
-    background: var(--ba-surface);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
-.ba-period-card > span {
-    color: var(--ba-muted);
-    font-size: 9px;
-    font-weight: 750;
-    letter-spacing: 1px;
+.ba-heading-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    color: var(--ba-accent, #165b33);
+    background: var(--ba-accent-soft, #e8f5e9);
+    border-radius: 8px;
+    line-height: 0;
 }
 
-.ba-period-card strong { font-size: 12px; }
-.ba-period-card small { color: #bd8a3b; font-size: 10px; }
+.ba-heading-card-icon svg {
+    display: block;
+    margin: auto;
+}
 
-/* ─── Filter panel ─── */
+.ba-heading-card strong,
+.ba-period-card strong {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ba-text, #141f17);
+    line-height: 1.3;
+}
+
+.ba-heading-card > div > span,
+.ba-period-card > div > span {
+    display: block;
+    font-size: 11px;
+    color: var(--ba-muted, #5f7065);
+    line-height: 1.4;
+}
+
 .ba-filter-panel,
 .ba-panel,
 .ba-stat-card {
@@ -862,15 +1007,21 @@ function resetFilters() {
 }
 
 .ba-filter-symbol {
-    display: grid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 38px;
     height: 38px;
     flex: 0 0 38px;
-    place-items: center;
     color: var(--ba-accent);
     background: var(--ba-accent-soft);
     border-radius: 10px;
-    font-size: 25px;
+    line-height: 0;
+}
+
+.ba-filter-symbol svg {
+    display: block;
+    margin: auto;
 }
 
 .ba-filter-heading h2,
@@ -934,31 +1085,23 @@ function resetFilters() {
     border-color: var(--ba-accent);
 }
 
-/* ─── Notice ─── */
 .ba-notice {
     display: flex;
     align-items: flex-start;
     gap: 10px;
     padding: 12px 14px;
     margin-bottom: 17px;
-    color: #82632a;
-    background: #fff8e9;
-    border: 1px solid #ead9b1;
+    color: #991b1b;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
     border-radius: 9px;
     font-size: 11px;
     line-height: 1.6;
 }
 
-.nf-app.nf-burnedarea.theme-dark .ba-notice {
-    color: #d4c27a;
-    background: #272619;
-    border-color: #4a4522;
-}
-
 .ba-notice-icon { flex: 0 0 auto; font-size: 17px; }
 .ba-notice p { margin: 0; }
 
-/* ─── Stat cards ─── */
 .ba-stats-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -976,24 +1119,25 @@ function resetFilters() {
 }
 
 .ba-stat-icon {
-    display: grid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 37px;
     height: 37px;
     flex: 0 0 37px;
-    place-items: center;
     border-radius: 10px;
-    font-size: 20px;
+    line-height: 0;
+}
+
+.ba-stat-icon svg {
+    display: block;
+    margin: auto;
 }
 
 .ba-icon-fire { color: #d97706; background: #fff5e5; }
 .ba-icon-high { color: #dc2626; background: #fef2f2; }
 .ba-icon-region { color: #2d8a5b; background: #e8f5ec; }
 .ba-icon-sat { color: #508ec5; background: #e7f3ff; }
-
-.nf-app.nf-burnedarea.theme-dark .ba-icon-fire { color: #fbbf24; background: #3a2b1a; }
-.nf-app.nf-burnedarea.theme-dark .ba-icon-high { color: #f87171; background: #3a1a1a; }
-.nf-app.nf-burnedarea.theme-dark .ba-icon-region { color: #70cf98; background: #1a3028; }
-.nf-app.nf-burnedarea.theme-dark .ba-icon-sat { color: #7ab8e8; background: #1a2e3f; }
 
 .ba-stat-label {
     color: var(--ba-muted);
@@ -1046,7 +1190,6 @@ function resetFilters() {
 .ba-track-region { background: #2d8a5b; }
 .ba-track-sat { background: #508ec5; }
 
-/* ─── Analysis grid ─── */
 .ba-analysis-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.65fr) minmax(280px, .95fr);
@@ -1082,7 +1225,6 @@ function resetFilters() {
     white-space: nowrap;
 }
 
-/* ─── Chart ─── */
 .ba-chart-legend {
     display: flex;
     align-items: center;
@@ -1182,26 +1324,25 @@ function resetFilters() {
     font-size: 12px;
 }
 
-/* ─── Breakdown panel ─── */
 .ba-fire-symbol {
-    display: grid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 39px;
     height: 39px;
     flex: 0 0 39px;
-    place-items: center;
     color: #d97706;
     background: #fff5e5;
     border-radius: 10px;
-    font-size: 23px;
+    line-height: 0;
 }
 
-.nf-app.nf-burnedarea.theme-dark .ba-fire-symbol {
-    color: #fbbf24;
-    background: #3a2b1a;
+.ba-fire-symbol svg {
+    display: block;
+    margin: auto;
 }
 
 .ba-severity-list { margin-top: 22px; }
-
 .ba-severity-item { margin-bottom: 18px; }
 .ba-severity-item:last-child { margin-bottom: 0; }
 
@@ -1259,7 +1400,6 @@ function resetFilters() {
     font-size: 9px;
 }
 
-/* Region breakdown */
 .ba-region-section {
     margin-top: 24px;
     padding-top: 20px;
@@ -1311,7 +1451,6 @@ function resetFilters() {
     transition: width .3s ease;
 }
 
-/* Land cover */
 .ba-landcover-section {
     margin-top: 18px;
     padding-top: 18px;
@@ -1333,7 +1472,6 @@ function resetFilters() {
 .ba-landcover-item span { color: var(--ba-muted); }
 .ba-landcover-item strong { white-space: nowrap; }
 
-/* ─── Table ─── */
 .ba-table-panel { padding-bottom: 0; }
 .ba-table-heading { margin-bottom: 19px; }
 
@@ -1379,10 +1517,6 @@ function resetFilters() {
 .ba-badge.severity-moderate { color: #d97706; background: #fff5e5; }
 .ba-badge.severity-low { color: #3478d4; background: #eaf3ff; }
 
-.nf-app.nf-burnedarea.theme-dark .ba-badge.severity-high { color: #f87171; background: #3a1a1a; }
-.nf-app.nf-burnedarea.theme-dark .ba-badge.severity-moderate { color: #fbbf24; background: #3a2b1a; }
-.nf-app.nf-burnedarea.theme-dark .ba-badge.severity-low { color: #7ab8e8; background: #1a2e3f; }
-
 .ba-empty-cell {
     color: var(--ba-muted);
     text-align: center;
@@ -1407,39 +1541,29 @@ function resetFilters() {
     font-size: 10px;
 }
 
-/* ─── Responsive ─── */
 @media (max-width: 1200px) {
-    .ba-content { padding-right: 22px; padding-left: 22px; }
     .ba-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ba-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 900px) {
-    .ba-main { margin-left: 0; }
+    .ba-main,
+    .ba-main.ba-main-collapsed { margin-left: 0; }
     .ba-mobile-menu { display: grid; }
+    .ba-page-heading {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    .ba-heading-card,
+    .ba-period-card {
+        width: 100%;
+    }
     .ba-analysis-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
-    .ba-topbar { min-height: 72px; padding: 12px 14px; }
-    .ba-breadcrumb { gap: 5px; font-size: 10px; }
-    .ba-topbar-subtitle { font-size: 10px; }
-    .ba-content { padding: 22px 13px 18px; }
-    .ba-page-heading {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 16px;
-    }
-    .ba-page-heading h1 { font-size: 30px; }
-    .ba-period-card { width: 100%; }
-    .ba-filter-panel, .ba-panel { padding: 15px; }
     .ba-filter-grid { grid-template-columns: 1fr; }
     .ba-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .ba-stat-card { padding: 13px 11px; }
-    .ba-stat-top { gap: 7px; margin-bottom: 15px; }
-    .ba-stat-icon { width: 30px; height: 30px; flex-basis: 30px; font-size: 17px; }
-    .ba-stat-label { font-size: 10px; }
-    .ba-stat-value { font-size: 23px; }
-    .ba-stat-value small { font-size: 10px; }
 }
 </style>

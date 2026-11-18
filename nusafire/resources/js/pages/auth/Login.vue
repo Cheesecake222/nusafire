@@ -42,8 +42,42 @@ function submit() {
             :title="theme === 'dark' ? 'Light mode' : 'Dark mode'"
             @click="toggleTheme"
         >
-            <span v-if="theme === 'dark'">☀</span>
-            <span v-else>☾</span>
+            <svg
+                v-if="theme === 'dark'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                width="18"
+                height="18"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+            <svg
+                v-else
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                width="18"
+                height="18"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
         </button>
 
         <section class="login-visual">
@@ -135,19 +169,11 @@ function submit() {
             <div class="visual-content">
                 <Link href="/" class="brand-lockup">
                     <span class="brand-symbol">
-                        <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
-                            <path
-                                d="M20 4L7 22h9l-3 13 14-19h-9L20 4Z"
-                                fill="currentColor"
-                            />
-                            <path
-                                d="M5 29c5-3 9-3 14 0s10 3 16-1"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                opacity=".6"
-                            />
-                        </svg>
+                        <img
+                            src="/logo.png"
+                            alt="NusaFire Logo"
+                            class="brand-logo-img"
+                        />
                     </span>
 
                     <span class="brand-text">
@@ -176,7 +202,15 @@ function submit() {
 
                     <div class="visual-features">
                         <div class="feature-item">
-                            <span class="feature-icon">◎</span>
+                            <span class="feature-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="22" y1="12" x2="18" y2="12" />
+                                    <line x1="6" y1="12" x2="2" y2="12" />
+                                    <line x1="12" y1="6" x2="12" y2="2" />
+                                    <line x1="12" y1="22" x2="12" y2="18" />
+                                </svg>
+                            </span>
                             <div>
                                 <strong>Hotspot monitoring</strong>
                                 <span>Discover fire activity patterns</span>
@@ -184,7 +218,11 @@ function submit() {
                         </div>
 
                         <div class="feature-item">
-                            <span class="feature-icon">⌁</span>
+                            <span class="feature-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                                </svg>
+                            </span>
                             <div>
                                 <strong>Environmental insights</strong>
                                 <span>Explore weather and fire data</span>
@@ -208,19 +246,11 @@ function submit() {
             <div class="login-panel-inner">
                 <div class="mobile-brand">
                     <span class="brand-symbol">
-                        <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
-                            <path
-                                d="M20 4L7 22h9l-3 13 14-19h-9L20 4Z"
-                                fill="currentColor"
-                            />
-                            <path
-                                d="M5 29c5-3 9-3 14 0s10 3 16-1"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                opacity=".6"
-                            />
-                        </svg>
+                        <img
+                            src="/logo.png"
+                            alt="NusaFire Logo"
+                            class="brand-logo-img"
+                        />
                     </span>
                     <span class="brand-text">
                         <strong>NusaFire</strong>
@@ -469,7 +499,9 @@ function submit() {
     transition: color .2s ease, background .2s ease;
 }
 
-.login-page.theme-dark {
+.login-page.theme-dark,
+html.theme-dark .login-page,
+html.dark .login-page {
     --login-bg: #111914;
     --login-surface: #19231c;
     --login-text: #edf4ed;
@@ -514,18 +546,24 @@ function submit() {
     top: 24px;
     right: 25px;
     z-index: 10;
-    display: grid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 40px;
     height: 40px;
-    place-items: center;
     color: var(--login-text);
     background: var(--login-surface);
     border: 1px solid var(--login-border);
     border-radius: 12px;
     box-shadow: 0 3px 12px rgb(0 0 0 / 4%);
     cursor: pointer;
-    font-size: 20px;
+    line-height: 0;
     transition: background .2s ease, color .2s ease;
+}
+
+.theme-switch svg {
+    display: block;
+    margin: auto;
 }
 
 .theme-switch:hover {
@@ -609,20 +647,31 @@ function submit() {
 }
 
 .brand-symbol {
-    display: grid;
-    width: 43px;
-    height: 43px;
-    flex: 0 0 43px;
-    place-items: center;
-    color: #fff;
-    background: #2d8657;
-    border: 1px solid rgb(255 255 255 / 14%);
+    display: flex;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
     border-radius: 12px;
+    padding: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
 }
 
-.brand-symbol svg {
-    width: 31px;
-    height: 31px;
+.theme-dark .brand-symbol,
+html.dark .brand-symbol {
+    background: #19231c;
+    border-color: #2b3a2e;
+}
+
+.brand-symbol .brand-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
 }
 
 .brand-text {
@@ -702,16 +751,22 @@ function submit() {
 }
 
 .feature-icon {
-    display: grid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 41px;
     height: 41px;
     flex: 0 0 41px;
-    place-items: center;
     color: #a6d6b0;
     background: rgb(255 255 255 / 7%);
     border: 1px solid rgb(255 255 255 / 10%);
     border-radius: 11px;
-    font-size: 23px;
+    line-height: 0;
+}
+
+.feature-icon svg {
+    display: block;
+    margin: auto;
 }
 
 .feature-item div {
@@ -1165,8 +1220,7 @@ function submit() {
     }
 
     .mobile-brand .brand-symbol {
-        color: #fff;
-        background: #287a50;
+        background: #ffffff;
     }
 
     .mobile-brand .brand-text strong {
