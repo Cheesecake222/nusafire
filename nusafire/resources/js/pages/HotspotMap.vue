@@ -296,57 +296,6 @@ const hasActiveFilter = computed(() =>
     Boolean(formEndDate.value),
 );
 
-// Presentation-only counters: animate the already-computed values without
-// changing API requests, filters, or the underlying hotspot data.
-const animatedStatValues = ref<[number, number, number]>([0, 0, 0]);
-let statAnimationFrame: number | null = null;
-
-function animateStatCounters(): void {
-    const targets: [number, number, number] = [
-        Number(totalHotspots.value) || 0,
-        Number(totalNonFire.value) || 0,
-        Number(affectedProvincesCount.value) || 0,
-    ];
-
-    if (statAnimationFrame !== null) {
-        window.cancelAnimationFrame(statAnimationFrame);
-        statAnimationFrame = null;
-    }
-
-    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (reducedMotion) {
-        animatedStatValues.value = targets;
-        return;
-    }
-
-    const starts = [...animatedStatValues.value] as [number, number, number];
-    const startTime = performance.now();
-    const duration = 1050;
-
-    const tick = (now: number) => {
-        const progress = Math.min((now - startTime) / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-
-        animatedStatValues.value = targets.map(
-            (target, index) => starts[index] + (target - starts[index]) * eased,
-        ) as [number, number, number];
-
-        if (progress < 1) {
-            statAnimationFrame = window.requestAnimationFrame(tick);
-        } else {
-            animatedStatValues.value = targets;
-            statAnimationFrame = null;
-        }
-    };
-
-    statAnimationFrame = window.requestAnimationFrame(tick);
-}
-
-watch(
-    [totalHotspots, totalNonFire, affectedProvincesCount],
-    () => animateStatCounters(),
-);
-
 function getCsrfToken(): string {
     return (
         document
@@ -593,29 +542,6 @@ async function handleMapClick(e: L.LeafletMouseEvent): Promise<void> {
         predictingPin.value = false;
     }
 }
-
-function closeMapExpansion(): void {
-    isMapExpanded.value = false;
-}
-
-function handleMapEscape(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && isMapExpanded.value) {
-        closeMapExpansion();
-    }
-}
-
-watch(isMapExpanded, async (expanded) => {
-    if (expanded) {
-        previousBodyOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-    } else {
-        document.body.style.overflow = previousBodyOverflow;
-    }
-
-    await nextTick();
-    // Leaflet must recalculate its dimensions after the map is enlarged/restored.
-    window.setTimeout(() => map?.invalidateSize({ pan: false }), 80);
-});
 
 function initializeMap(): void {
     if (!mapElement.value || map) return;
@@ -1029,7 +955,6 @@ watch(
 );
 
 onMounted(async () => {
-    window.addEventListener('keydown', handleMapEscape);
     const saved = localStorage.getItem('nf-sidebar-collapsed');
     if (saved !== null) sidebarCollapsed.value = saved === 'true';
     await nextTick();
@@ -1212,7 +1137,7 @@ onBeforeUnmount(() => {
                             </span>
                         </div>
                         <div class="nf-stat-value">
-                            {{ loading ? '—' : Math.round(animatedStatValues[0]).toLocaleString('en-US') }}
+                            {{ loading ? '—' : totalHotspots.toLocaleString('en-US') }}
                         </div>
                         <p>
                             {{
@@ -1246,7 +1171,7 @@ onBeforeUnmount(() => {
                             </span>
                         </div>
                         <div class="nf-stat-value">
-                            {{ loading ? '—' : animatedStatValues[1].toLocaleString('en-US', { maximumFractionDigits: 1 }) }}
+                            {{ loading ? '—' : totalNonFire.toLocaleString('en-US') }}
                         </div>
                         <p>
                             {{
@@ -1273,7 +1198,7 @@ onBeforeUnmount(() => {
                             <span>{{ mapMode === 'firms' ? 'Detected Provinces' : 'Monitored Provinces' }}</span>
                         </div>
                         <div class="nf-stat-value">
-                            {{ loading ? '—' : Math.round(animatedStatValues[2]) }}
+                            {{ loading ? '—' : affectedProvincesCount }}
                         </div>
                         <p>
                             {{
@@ -1492,36 +1417,16 @@ onBeforeUnmount(() => {
                                 @click="closeMapExpansion"
                             ></div>
 
-                            <div class="nf-map-wrap" :class="{ 'is-expanded': isMapExpanded, 'theme-dark': theme === 'dark' }">
-                                <button
-                                    class="nf-map-expand-button"
-                                    type="button"
-                                    :aria-label="isMapExpanded ? 'Close enlarged map' : 'Enlarge map'"
-                                    :title="isMapExpanded ? 'Close map view (Esc)' : 'Enlarge map'"
-                                    @click="isMapExpanded ? closeMapExpansion() : (isMapExpanded = true)"
-                                >
-                                    <svg v-if="!isMapExpanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true">
-                                        <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5" />
-                                        <path d="M3 3l7 7M21 3l-7 7M3 21l7-7M21 21l-7-7" opacity=".0" />
-                                    </svg>
-                                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true">
-                                        <path d="M8 3v5H3M16 3v5h5M3 16h5v5M21 16h-5v5" />
-                                    </svg>
-                                </button>
-
-                                <div ref="mapElement" class="nf-leaflet-map"></div>
-
-                                <div v-if="loading" class="nf-map-message">
-                                    Loading hotspot data...
-                                </div>
-                                <div v-else-if="errorMessage" class="nf-map-message">
-                                    {{ errorMessage }}
-                                </div>
-                                <div v-else-if="filteredHotspots.length === 0" class="nf-map-message">
-                                    No matching data found.
-                                </div>
+                            <div v-if="loading" class="nf-map-message">
+                                Loading hotspot data...
                             </div>
-                        </Teleport>
+                            <div v-else-if="errorMessage" class="nf-map-message">
+                                {{ errorMessage }}
+                            </div>
+                            <div v-else-if="filteredHotspots.length === 0" class="nf-map-message">
+                                No matching data found.
+                            </div>
+                        </div>
 
                         <div class="nf-map-footer">
                             <span><i></i> OpenStreetMap · {{ firmsSourceLabel }}</span>
@@ -2990,122 +2895,6 @@ html.dark .nf-app.nf-hotspotmap {
 
     .nf-map-wrap {
         height: 310px;
-    }
-
-    .nf-map-wrap.is-expanded {
-        inset: 16px;
-        border-radius: 12px;
-    }
-
-    .nf-map-wrap.is-expanded .nf-map-expand-button {
-        top: 10px;
-        right: 10px;
-    }
-}
-
-
-/* Subtle entrance motion — presentation only; data and integrations stay untouched. */
-@keyframes nf-hm-fade-up {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes nf-hm-fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes nf-hm-marker-pop {
-    from { opacity: 0; transform: scale(.55); }
-    to { opacity: 1; transform: scale(1); }
-}
-
-.nf-app.nf-hotspotmap .nf-topbar {
-    animation: nf-hm-fade-in .42s ease-out both;
-}
-
-.nf-app.nf-hotspotmap .nf-page-heading {
-    animation: nf-hm-fade-up .52s cubic-bezier(.2, .7, .25, 1) both;
-}
-
-.nf-app.nf-hotspotmap .nf-heading-card,
-.nf-app.nf-hotspotmap .nf-export-btn {
-    animation: nf-hm-fade-up .5s ease-out .1s both;
-}
-
-.nf-app.nf-hotspotmap .nf-stat-card {
-    animation: nf-hm-fade-up .58s cubic-bezier(.2, .7, .25, 1) both;
-    transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
-}
-
-.nf-app.nf-hotspotmap .nf-stat-card:nth-child(1) { animation-delay: .08s; }
-.nf-app.nf-hotspotmap .nf-stat-card:nth-child(2) { animation-delay: .16s; }
-.nf-app.nf-hotspotmap .nf-stat-card:nth-child(3) { animation-delay: .24s; }
-.nf-app.nf-hotspotmap .nf-stat-card:nth-child(4) { animation-delay: .32s; }
-
-.nf-app.nf-hotspotmap .nf-stat-card:hover {
-    transform: translateY(-3px);
-    border-color: color-mix(in srgb, var(--hm-brand) 28%, var(--hm-border));
-    box-shadow: 0 10px 28px rgb(23 49 33 / 8%);
-}
-
-.nf-app.nf-hotspotmap .nf-stat-value {
-    font-variant-numeric: tabular-nums;
-    animation: nf-hm-fade-in .5s ease-out both;
-}
-
-.nf-app.nf-hotspotmap .nf-filter-panel {
-    animation: nf-hm-fade-up .55s ease-out .18s both;
-}
-
-.nf-app.nf-hotspotmap .nf-main-grid > .nf-panel {
-    animation: nf-hm-fade-up .62s cubic-bezier(.2, .7, .25, 1) both;
-}
-
-.nf-app.nf-hotspotmap .nf-main-grid > .nf-panel:nth-child(2) {
-    animation-delay: .12s;
-}
-
-.nf-app.nf-hotspotmap .nf-table-panel {
-    animation: nf-hm-fade-up .58s ease-out .22s both;
-}
-
-.nf-app.nf-hotspotmap .nf-map-wrap {
-    animation: nf-hm-fade-in .7s ease-out .2s both;
-}
-
-.nf-app.nf-hotspotmap .nf-hotspot-marker {
-    animation: nf-hm-marker-pop .32s cubic-bezier(.2, .8, .25, 1) both;
-    transition: box-shadow .2s ease, filter .2s ease;
-}
-
-.nf-app.nf-hotspotmap .nf-hotspot-marker:hover {
-    filter: brightness(1.08);
-    box-shadow: 0 0 0 5px rgb(34 197 94 / 16%), 0 2px 8px rgb(0 0 0 / 25%);
-}
-
-.nf-app.nf-hotspotmap .nf-mode-btn,
-.nf-app.nf-hotspotmap .nf-button,
-.nf-app.nf-hotspotmap .nf-icon-button,
-.nf-app.nf-hotspotmap .nf-view-button {
-    transition: color .18s ease, background .18s ease, border-color .18s ease,
-        box-shadow .18s ease, transform .18s ease;
-}
-
-.nf-app.nf-hotspotmap .nf-mode-btn:hover,
-.nf-app.nf-hotspotmap .nf-icon-button:hover,
-.nf-app.nf-hotspotmap .nf-view-button:hover {
-    transform: translateY(-1px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .nf-app.nf-hotspotmap *,
-    .nf-app.nf-hotspotmap *::before,
-    .nf-app.nf-hotspotmap *::after {
-        animation-duration: .01ms !important;
-        animation-iteration-count: 1 !important;
-        scroll-behavior: auto !important;
-        transition-duration: .01ms !important;
     }
 }
 </style>
